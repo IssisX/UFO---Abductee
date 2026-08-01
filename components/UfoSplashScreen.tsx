@@ -4,7 +4,8 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { Play, Zap, Compass, Flame, Sparkles } from 'lucide-react';
+import { Play, Sparkles } from 'lucide-react';
+import { motion } from 'motion/react';
 
 interface UfoSplashScreenProps {
   onStartGame: () => void;
@@ -335,61 +336,83 @@ export const UfoSplashScreen: React.FC<UfoSplashScreenProps> = ({ onStartGame })
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-between p-4 sm:p-8 font-sans overflow-hidden select-none">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 1 }}
+      className="fixed inset-0 z-50 flex flex-col justify-between p-4 sm:p-8 font-sans overflow-hidden select-none"
+    >
       {/* Background Animated Canvas */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover" />
 
       {/* Glassmorphism Subtle Gradient Overlays */}
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/60 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/40 to-slate-950/80 pointer-events-none" />
 
       {/* TOP HEADER TITLE */}
-      <div className="relative z-10 w-full max-w-4xl mx-auto text-center pt-4 sm:pt-8 animate-fadeIn">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-950/80 border border-cyan-400/50 text-cyan-300 text-xs font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 mb-3 animate-pulse">
+      <motion.div 
+        initial={{ y: -50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.2, type: 'spring', stiffness: 100 }}
+        className="relative z-10 w-full max-w-4xl mx-auto text-center pt-8 sm:pt-12"
+      >
+        <motion.div 
+          animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
+          transition={{ duration: 3, repeat: Infinity }}
+          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-400/50 text-cyan-300 text-xs font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 mb-4"
+        >
           <Sparkles size={14} className="text-lime-400" />
           <span>EARTH INVASION 3D SIMULATOR</span>
-        </div>
+        </motion.div>
 
-        <h1 className="text-4xl sm:text-7xl font-black uppercase tracking-tight text-white drop-shadow-[0_10px_35px_rgba(6,182,212,0.8)]">
+        <h1 className="text-5xl sm:text-8xl font-black uppercase tracking-tight text-white drop-shadow-[0_10px_35px_rgba(6,182,212,0.8)]">
           UFO <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-lime-300 to-emerald-300">ABDUCTION</span>
         </h1>
-        <p className="text-xs sm:text-sm font-bold text-slate-300 tracking-wider uppercase mt-1 drop-shadow">
+        <p className="text-sm sm:text-base font-bold text-slate-300 tracking-wider uppercase mt-3 drop-shadow">
           PILOT THE MOTHERSHIP • ABDUCT PEDESTRIANS • CAUSE CHAOS
         </p>
-      </div>
+      </motion.div>
 
       {/* BOTTOM ACTION BAR - LAUNCH BUTTON & QUICK KEYS */}
-      <div className="relative z-10 w-full max-w-xl mx-auto flex flex-col items-center gap-4 pb-6 sm:pb-12">
+      <motion.div 
+        initial={{ y: 50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.4, type: 'spring', stiffness: 100 }}
+        className="relative z-10 w-full max-w-xl mx-auto flex flex-col items-center gap-6 pb-8 sm:pb-16"
+      >
         {/* Quick Controls Pills */}
-        <div className="flex flex-wrap justify-center items-center gap-2 bg-slate-950/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-slate-800 shadow-2xl text-xs text-slate-200">
-          <div className="flex items-center gap-1.5 font-bold">
-            <kbd className="px-2 py-0.5 bg-slate-800 text-cyan-300 rounded font-mono">WASD</kbd>
+        <div className="flex flex-wrap justify-center items-center gap-3 bg-slate-950/80 backdrop-blur-md px-5 py-3 rounded-2xl border border-slate-800 shadow-2xl text-xs sm:text-sm text-slate-200">
+          <div className="flex items-center gap-2 font-bold">
+            <kbd className="px-2.5 py-1 bg-slate-800 text-cyan-300 rounded-md border border-slate-700 shadow-inner font-mono">WASD</kbd>
             <span>Fly</span>
           </div>
-          <span className="text-slate-700">•</span>
-          <div className="flex items-center gap-1.5 font-bold">
-            <kbd className="px-2 py-0.5 bg-slate-800 text-lime-300 rounded font-mono">F / ACTION</kbd>
+          <span className="text-slate-700 font-black px-1">•</span>
+          <div className="flex items-center gap-2 font-bold">
+            <kbd className="px-2.5 py-1 bg-slate-800 text-lime-300 rounded-md border border-slate-700 shadow-inner font-mono">F / ACTION</kbd>
             <span>Abduct</span>
           </div>
-          <span className="text-slate-700">•</span>
-          <div className="flex items-center gap-1.5 font-bold">
-            <kbd className="px-2 py-0.5 bg-slate-800 text-amber-300 rounded font-mono">SHIFT</kbd>
+          <span className="text-slate-700 font-black px-1">•</span>
+          <div className="flex items-center gap-2 font-bold">
+            <kbd className="px-2.5 py-1 bg-slate-800 text-amber-300 rounded-md border border-slate-700 shadow-inner font-mono">SHIFT</kbd>
             <span>Boost</span>
           </div>
         </div>
 
         {/* MASSIVE BADASS LAUNCH BUTTON */}
-        <button
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={onStartGame}
-          className="group relative w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-sm sm:text-base tracking-widest uppercase rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.4)] flex items-center justify-center gap-2 active:scale-95 transition-all duration-300 border border-cyan-400/50 cursor-pointer overflow-hidden"
+          className="group relative w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-cyan-600 to-indigo-600 text-white font-black text-lg sm:text-xl tracking-widest uppercase rounded-2xl shadow-[0_0_40px_rgba(34,211,238,0.5)] flex items-center justify-center gap-3 border-2 border-cyan-300/50 cursor-pointer overflow-hidden"
         >
           {/* Button Shine Sweep Effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out" />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] transition-all" />
           
-          <Play size={28} fill="currentColor" className="group-hover:scale-125 transition-transform" />
-          <span>START ABDUCTION NOW</span>
-        </button>
-      </div>
-    </div>
+          <Play size={28} fill="currentColor" className="group-hover:text-lime-300 transition-colors drop-shadow" />
+          <span className="drop-shadow">START INVASION</span>
+        </motion.button>
+      </motion.div>
+    </motion.div>
   );
 };
 

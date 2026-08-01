@@ -9,469 +9,8 @@ import { PlayerMode, GameModeTelemetry, VoxelData, Quest, WeaponMode, Mothership
 import { CityGenerator, CityWorld, Pedestrian } from './CityGenerator';
 import { CONFIG } from '../utils/voxelConstants';
 import { SpatialHashGrid } from './SpatialHashGrid';
-
-class GameAudioEngine {
-  private ctx: AudioContext | null = null;
-  private noiseBuffer: AudioBuffer | null = null;
-
-  private init() {
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        this.ctx = new AudioCtx();
-        this.buildNoiseBuffer();
-      }
-    }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {});
-    }
-  }
-
-  private buildNoiseBuffer() {
-    if (!this.ctx) return;
-    const bufferSize = this.ctx.sampleRate * 1.5; // 1.5s of noise
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-    this.noiseBuffer = buffer;
-  }
-
-  public playLaserSound() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-
-      // Primary synth oscillator (saw) + Sub oscillator (square)
-      const osc1 = this.ctx.createOscillator();
-      const osc2 = this.ctx.createOscillator();
-      const filter = this.ctx.createBiquadFilter();
-      const gain = this.ctx.createGain();
-
-      osc1.type = 'sawtooth';
-      osc2.type = 'square';
-
-      // Pitch sweep
-      osc1.frequency.setValueAtTime(1400, now);
-      osc1.frequency.exponentialRampToValueAtTime(180, now + 0.22);
-      osc2.frequency.setValueAtTime(700, now);
-      osc2.frequency.exponentialRampToValueAtTime(90, now + 0.22);
-
-      // Filter cutoff sweep
-      filter.type = 'lowpass';
-      filter.Q.value = 4;
-      filter.frequency.setValueAtTime(3200, now);
-      filter.frequency.exponentialRampToValueAtTime(200, now + 0.22);
-
-      // Volume envelope
-      gain.gain.setValueAtTime(0.35, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.23);
-
-      osc1.connect(filter);
-      osc2.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc1.start(now);
-      osc2.start(now);
-      osc1.stop(now + 0.24);
-      osc2.stop(now + 0.24);
-    } catch {}
-  }
-
-  public playExplosionSound() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-
-      // 1. Sub-bass shockwave
-      const subOsc = this.ctx.createOscillator();
-      const subGain = this.ctx.createGain();
-      subOsc.type = 'sine';
-      subOsc.frequency.setValueAtTime(110, now);
-      subOsc.frequency.exponentialRampToValueAtTime(25, now + 0.6);
-      subGain.gain.setValueAtTime(0.6, now);
-      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.62);
-      subOsc.connect(subGain);
-      subGain.connect(this.ctx.destination);
-      subOsc.start(now);
-      subOsc.stop(now + 0.63);
-
-      // 2. Filtered Noise Burst
-      if (this.noiseBuffer) {
-        const noiseSrc = this.ctx.createBufferSource();
-        noiseSrc.buffer = this.noiseBuffer;
-        const filter = this.ctx.createBiquadFilter();
-        const noiseGain = this.ctx.createGain();
-
-        filter.type = 'lowpass';
-        filter.Q.value = 3;
-        filter.frequency.setValueAtTime(1800, now);
-        filter.frequency.exponentialRampToValueAtTime(80, now + 0.55);
-
-        noiseGain.gain.setValueAtTime(0.45, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.58);
-
-        noiseSrc.connect(filter);
-        filter.connect(noiseGain);
-        noiseGain.connect(this.ctx.destination);
-
-        noiseSrc.start(now);
-        noiseSrc.stop(now + 0.6);
-      }
-    } catch {}
-  }
-
-  public playBounceSound() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const filter = this.ctx.createBiquadFilter();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(160, now);
-      osc.frequency.exponentialRampToValueAtTime(720, now + 0.22);
-
-      filter.type = 'lowpass';
-      filter.frequency.value = 1500;
-
-      gain.gain.setValueAtTime(0.35, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.23);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + 0.24);
-    } catch {}
-  }
-
-  public playWindBoostSound() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-
-      // Noise sweep for aerodynamic rush
-      if (this.noiseBuffer) {
-        const noiseSrc = this.ctx.createBufferSource();
-        noiseSrc.buffer = this.noiseBuffer;
-        const filter = this.ctx.createBiquadFilter();
-        const gain = this.ctx.createGain();
-
-        filter.type = 'bandpass';
-        filter.Q.value = 4;
-        filter.frequency.setValueAtTime(300, now);
-        filter.frequency.exponentialRampToValueAtTime(2400, now + 0.35);
-
-        gain.gain.setValueAtTime(0.35, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
-
-        noiseSrc.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.ctx.destination);
-
-        noiseSrc.start(now);
-        noiseSrc.stop(now + 0.4);
-      }
-
-      // Tonal pitch glissando
-      const osc = this.ctx.createOscillator();
-      const oscGain = this.ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(220, now);
-      osc.frequency.exponentialRampToValueAtTime(950, now + 0.35);
-
-      oscGain.gain.setValueAtTime(0.18, now);
-      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
-
-      osc.connect(oscGain);
-      oscGain.connect(this.ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.37);
-    } catch {}
-  }
-
-  public playAlienTelepathySound() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-
-      // FM Synthesis: Carrier + Modulator
-      const carrier = this.ctx.createOscillator();
-      const modulator = this.ctx.createOscillator();
-      const modGain = this.ctx.createGain();
-      const masterGain = this.ctx.createGain();
-
-      carrier.type = 'sine';
-      modulator.type = 'sine';
-
-      carrier.frequency.setValueAtTime(520, now);
-      carrier.frequency.exponentialRampToValueAtTime(1300, now + 0.2);
-      carrier.frequency.exponentialRampToValueAtTime(400, now + 0.4);
-
-      modulator.frequency.value = 28; // FM wobble
-      modGain.gain.value = 180;
-
-      masterGain.gain.setValueAtTime(0.25, now);
-      masterGain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
-
-      modulator.connect(modGain);
-      modGain.connect(carrier.frequency);
-      carrier.connect(masterGain);
-      masterGain.connect(this.ctx.destination);
-
-      modulator.start(now);
-      carrier.start(now);
-      modulator.stop(now + 0.43);
-      carrier.stop(now + 0.43);
-    } catch {}
-  }
-
-  public playAlienScareSound() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-
-      const osc = this.ctx.createOscillator();
-      const filter = this.ctx.createBiquadFilter();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(180, now);
-      osc.frequency.exponentialRampToValueAtTime(1400, now + 0.12);
-      osc.frequency.exponentialRampToValueAtTime(90, now + 0.42);
-
-      filter.type = 'lowpass';
-      filter.Q.value = 6;
-      filter.frequency.setValueAtTime(2500, now);
-      filter.frequency.exponentialRampToValueAtTime(300, now + 0.42);
-
-      gain.gain.setValueAtTime(0.35, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.44);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + 0.45);
-    } catch {}
-  }
-
-  public playMeowSound() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(380, now);
-      osc.frequency.linearRampToValueAtTime(680, now + 0.14);
-      osc.frequency.linearRampToValueAtTime(480, now + 0.38);
-
-      gain.gain.setValueAtTime(0.01, now);
-      gain.gain.linearRampToValueAtTime(0.28, now + 0.06);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + 0.39);
-    } catch {}
-  }
-
-  public playPickupSound() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-      const freqs = [523.25, 659.25, 783.99, 1046.50, 1318.51]; // C5 E5 G5 C6 E6
-      freqs.forEach((freq, idx) => {
-        const osc = this.ctx!.createOscillator();
-        const gain = this.ctx!.createGain();
-        osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
-        osc.frequency.setValueAtTime(freq, now + idx * 0.05);
-
-        gain.gain.setValueAtTime(0.2, now + idx * 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.18);
-
-        osc.connect(gain);
-        gain.connect(this.ctx!.destination);
-
-        osc.start(now + idx * 0.05);
-        osc.stop(now + idx * 0.05 + 0.19);
-      });
-    } catch {}
-  }
-
-  public playAbductionSound() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-
-      // 1. Tractor Beam FM Hum
-      const carrier = this.ctx.createOscillator();
-      const modulator = this.ctx.createOscillator();
-      const modGain = this.ctx.createGain();
-      const beamGain = this.ctx.createGain();
-
-      carrier.type = 'sine';
-      modulator.type = 'sine';
-
-      carrier.frequency.setValueAtTime(280, now);
-      carrier.frequency.exponentialRampToValueAtTime(1400, now + 0.45);
-      carrier.frequency.exponentialRampToValueAtTime(600, now + 0.7);
-
-      modulator.frequency.value = 16; // Alien tractor beam pulse
-      modGain.gain.value = 120;
-
-      beamGain.gain.setValueAtTime(0.3, now);
-      beamGain.gain.exponentialRampToValueAtTime(0.001, now + 0.72);
-
-      modulator.connect(modGain);
-      modGain.connect(carrier.frequency);
-      carrier.connect(beamGain);
-      beamGain.connect(this.ctx.destination);
-
-      modulator.start(now);
-      carrier.start(now);
-      modulator.stop(now + 0.73);
-      carrier.stop(now + 0.73);
-
-      // 2. High Shimmer Ring
-      const chime = this.ctx.createOscillator();
-      const chimeGain = this.ctx.createGain();
-      chime.type = 'triangle';
-      chime.frequency.setValueAtTime(1200, now + 0.2);
-      chime.frequency.exponentialRampToValueAtTime(2400, now + 0.6);
-
-      chimeGain.gain.setValueAtTime(0.01, now);
-      chimeGain.gain.setValueAtTime(0.18, now + 0.2);
-      chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.72);
-
-      chime.connect(chimeGain);
-      chimeGain.connect(this.ctx.destination);
-
-      chime.start(now + 0.2);
-      chime.stop(now + 0.73);
-    } catch {}
-  }
-
-  public playQuestSound() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-      const chord = [523.25, 659.25, 783.99, 987.77, 1046.50, 1318.51];
-      chord.forEach((freq, i) => {
-        const osc = this.ctx!.createOscillator();
-        const filter = this.ctx!.createBiquadFilter();
-        const gain = this.ctx!.createGain();
-
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + i * 0.07);
-
-        filter.type = 'lowpass';
-        filter.frequency.value = 2400;
-
-        gain.gain.setValueAtTime(0.22, now + i * 0.07);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.5);
-
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.ctx!.destination);
-
-        osc.start(now + i * 0.07);
-        osc.stop(now + i * 0.07 + 0.55);
-      });
-    } catch {}
-  }
-
-  public playSirenSound() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-
-      // Two-tone wail with bandpass filter
-      const osc = this.ctx.createOscillator();
-      const filter = this.ctx.createBiquadFilter();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(620, now);
-      osc.frequency.linearRampToValueAtTime(960, now + 0.2);
-      osc.frequency.linearRampToValueAtTime(620, now + 0.4);
-
-      filter.type = 'bandpass';
-      filter.Q.value = 2.5;
-      filter.frequency.value = 900;
-
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + 0.43);
-    } catch {}
-  }
-
-  private engineOsc: OscillatorNode | null = null;
-  private engineGain: GainNode | null = null;
-  private engineFilter: BiquadFilterNode | null = null;
-
-  public updateEngineHum(speedNorm: number) {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      if (!this.engineOsc) {
-        this.engineOsc = this.ctx.createOscillator();
-        this.engineFilter = this.ctx.createBiquadFilter();
-        this.engineGain = this.ctx.createGain();
-
-        this.engineOsc.type = 'sawtooth';
-        this.engineOsc.frequency.value = 55;
-
-        this.engineFilter.type = 'lowpass';
-        this.engineFilter.Q.value = 4;
-        this.engineFilter.frequency.value = 220;
-
-        this.engineGain.gain.value = 0.001;
-
-        this.engineOsc.connect(this.engineFilter);
-        this.engineFilter.connect(this.engineGain);
-        this.engineGain.connect(this.ctx.destination);
-        this.engineOsc.start();
-      }
-
-      const now = this.ctx.currentTime;
-      const targetGain = Math.min(0.12, 0.01 + speedNorm * 0.1);
-      const targetFreq = 50 + speedNorm * 85;
-      const targetCutoff = 180 + speedNorm * 550;
-
-      this.engineGain.gain.setTargetAtTime(targetGain, now, 0.08);
-      this.engineOsc.frequency.setTargetAtTime(targetFreq, now, 0.08);
-      this.engineFilter.frequency.setTargetAtTime(targetCutoff, now, 0.08);
-    } catch {}
-  }
-}
+import { GameAudioEngine } from './GameAudioEngine';
+import { UFO_QUESTS, ALIEN_QUESTS } from './GameQuests';
 
 interface ActiveRagdoll {
   mesh: THREE.Group;
@@ -491,21 +30,6 @@ interface ActiveRagdoll {
   timeAlive: number;
   recovered: boolean;
 }
-
-const UFO_QUESTS: Quest[] = [
-  { id: 'u0', title: 'First Abduction', description: 'Abduct 1 Civilian with Tractor Beam [F]', progress: 0, target: 1, completed: false, reward: 800 },
-  { id: 'u1', title: 'Crystal Harvester', description: 'Collect 3 Cyber Crystals', progress: 0, target: 3, completed: false, reward: 500 },
-  { id: 'a50', title: 'High Altitude', description: 'Reach 45m Altitude in Flight', progress: 0, target: 45, completed: false, reward: 750 },
-  { id: 'emp3', title: 'Shockwave Master', description: 'Fire Action Ability 3 Times', progress: 0, target: 3, completed: false, reward: 1000 },
-  { id: 'u2', title: 'Alien Scientist', description: 'Abduct 3 Civilians & Launch Ragdolls!', progress: 0, target: 3, completed: false, reward: 1500 }
-];
-
-const ALIEN_QUESTS: Quest[] = [
-  { id: 'al1', title: 'First Contact', description: 'Talk to or scare 3 civilians on foot [F]', progress: 0, target: 3, completed: false, reward: 800 },
-  { id: 'al2', title: 'Ground Explorer', description: 'Explore city sidewalks on foot', progress: 0, target: 1, completed: false, reward: 600 },
-  { id: 'al3', title: 'Roof Leaper', description: 'Use parkour bounce pads to jump onto roofs', progress: 0, target: 1, completed: false, reward: 900 },
-  { id: 'al4', title: 'Master Terrifier', description: 'Scare 5 civilians with Telepathy', progress: 0, target: 5, completed: false, reward: 1200 }
-];
 
 export class GameModeEngine {
   private scene: THREE.Scene;
@@ -553,6 +77,12 @@ export class GameModeEngine {
   private currentQuestIndex = 0;
   private quests: Quest[] = JSON.parse(JSON.stringify(UFO_QUESTS));
   private questCompletedFlash: string | null = null;
+  
+  // Advanced Flight Sim State
+  private flightMode: 'hover' | 'jet' = 'hover';
+  private jetPitch: number = 0;
+  private jetRoll: number = 0;
+  private jetThrottle: number = 0;
   private screenShake = 0;
 
   // Cinematic Camera State
@@ -738,10 +268,26 @@ export class GameModeEngine {
     });
     this.debrisBodies = [];
 
+    // Sunset Magic Hour Lighting
+    const sunsetSunLight = new THREE.DirectionalLight(0xffa044, 3.2);
+    sunsetSunLight.position.set(-180, 55, -220);
+    sunsetSunLight.castShadow = true;
+    this.scene.add(sunsetSunLight);
+
+    const sunsetHemiLight = new THREE.HemisphereLight(0xff8866, 0x2a1038, 1.6);
+    this.scene.add(sunsetHemiLight);
+
+    // Glowing Sunset Sun Object on horizon
+    const sunDiscMat = new THREE.MeshBasicMaterial({ color: 0xff7b00 });
+    const sunDiscMesh = new THREE.Mesh(new THREE.SphereGeometry(28, 16, 16), sunDiscMat);
+    sunDiscMesh.position.set(-320, 45, -380);
+    this.scene.add(sunDiscMesh);
+
     const mass = mode === 'UFO' ? 500 : 80;
+    const startY = mode === 'UFO' ? 85 : CONFIG.FLOOR_Y + 2; // Start UFO much higher over city skyline
     this.ufoBody = new CANNON.Body({
       mass,
-      position: new CANNON.Vec3(0, mode === 'UFO' ? 35 : CONFIG.FLOOR_Y + 2, mode === 'UFO' ? 0 : 12),
+      position: new CANNON.Vec3(0, startY, mode === 'UFO' ? 0 : 12),
       shape: new CANNON.Sphere(mode === 'UFO' ? 3.5 : 1.2),
       linearDamping: 0.8,
       angularDamping: 0.9,
@@ -780,7 +326,7 @@ export class GameModeEngine {
     // Initial Position
     if (mode === 'UFO') {
       this.posX = 0;
-      this.posY = 35;
+      this.posY = 85;
       this.posZ = 0;
     } else {
       this.posX = 0;
@@ -854,8 +400,13 @@ export class GameModeEngine {
     this.barrelRollCooldown = 1.8;
     this.audio.playWindBoostSound();
     this.screenShake = 1.8;
-    this.velX *= 1.6;
-    this.velZ *= 1.6;
+    
+    if (this.flightMode === 'jet') {
+      this.jetThrottle = 1.5; // Boost throttle
+    } else {
+      this.velX *= 1.6;
+      this.velZ *= 1.6;
+    }
 
     // Sonic boom shockwave ring
     const ringGeo = new THREE.RingGeometry(2, 6, 24);
@@ -885,28 +436,45 @@ export class GameModeEngine {
   private fireHomingTorpedoes() {
     if (this.interceptorJets.length === 0 && this.policeChasers.length === 0) return;
     
-    let targetPos: THREE.Vector3 | null = null;
+    let targetJet: any = null;
+    let targetPolice: any = null;
     let minDist = Infinity;
-
-    for (const jet of this.interceptorJets) {
-      const dist = Math.hypot(jet.posX - this.posX, jet.posY - this.posY, jet.posZ - this.posZ);
-      if (dist < minDist) {
-        minDist = dist;
-        targetPos = new THREE.Vector3(jet.posX, jet.posY, jet.posZ);
-      }
+    
+    let closestJetIdx = -1;
+    for (let i = 0; i < this.interceptorJets.length; i++) {
+        const jet = this.interceptorJets[i];
+        const dist = Math.hypot(jet.posX - this.posX, jet.posY - this.posY, jet.posZ - this.posZ);
+        if (dist < minDist) {
+          minDist = dist;
+          closestJetIdx = i;
+        }
     }
 
-    if (!targetPos) {
+    if (this.flightMode === 'jet') {
+        // Enforce lock-on for jets to fire in flight mode
+        if (closestJetIdx !== -1 && minDist < 120) {
+            targetJet = this.interceptorJets[closestJetIdx];
+        } else {
+            return; // No lock, can't fire
+        }
+    } else {
+        // Hover mode auto-targets closest
+        if (closestJetIdx !== -1) {
+            targetJet = this.interceptorJets[closestJetIdx];
+        }
+    }
+
+    if (!targetJet) {
       for (const p of this.policeChasers) {
         const dist = p.mesh.position.distanceTo(this.playerGroup.position);
         if (dist < minDist) {
           minDist = dist;
-          targetPos = p.mesh.position.clone();
+          targetPolice = p;
         }
       }
     }
 
-    if (!targetPos || minDist > 120) return;
+    if ((!targetJet && !targetPolice) || minDist > 120) return;
 
     this.audio.playLaserSound();
     const missileGroup = new THREE.Group();
@@ -919,14 +487,23 @@ export class GameModeEngine {
     missileGroup.position.set(this.posX, this.posY, this.posZ);
     this.scene.add(missileGroup);
 
-    const targetRef = targetPos;
     const startTime = performance.now();
 
     const updateMissile = () => {
       const elapsed = (performance.now() - startTime) / 1000;
-      if (elapsed < 1.2) {
-        missileGroup.position.lerp(targetRef, 0.12);
-        missileGroup.lookAt(targetRef);
+      if (elapsed < 3.0) { // Extended lifetime for moving targets
+        let currentTargetPos = new THREE.Vector3();
+        if (targetJet) {
+            currentTargetPos.set(targetJet.posX, targetJet.posY, targetJet.posZ);
+        } else if (targetPolice) {
+            currentTargetPos.copy(targetPolice.mesh.position);
+        }
+        
+        // Homing turn logic (fast turn rate)
+        missileGroup.lookAt(currentTargetPos);
+        // Move forward constantly at high speed
+        const speed = 150.0 * (1 / 60); // approx delta per frame at 60fps
+        missileGroup.translateZ(speed);
 
         if (Math.random() < 0.6) {
           const sGeo = new THREE.SphereGeometry(0.3, 4, 4);
@@ -941,18 +518,26 @@ export class GameModeEngine {
           }, 200);
         }
 
-        if (missileGroup.position.distanceTo(targetRef) < 4.0) {
-          this.explodeObject(targetRef, 0xef4444);
+        if (missileGroup.position.distanceTo(currentTargetPos) < 10.0) {
+          this.explodeObject(currentTargetPos, 0xef4444);
           this.audio.playExplosionSound();
           this.screenShake = 2.5;
           this.score += 1500;
           this.credits += 400;
 
-          for (let i = this.interceptorJets.length - 1; i >= 0; i--) {
-            if (this.interceptorJets[i].mesh.position.distanceTo(targetRef) < 6.0) {
-              this.scene.remove(this.interceptorJets[i].mesh);
-              this.interceptorJets.splice(i, 1);
-            }
+          if (targetJet) {
+              const idx = this.interceptorJets.indexOf(targetJet);
+              if (idx !== -1) {
+                  this.scene.remove(this.interceptorJets[idx].mesh);
+                  this.interceptorJets.splice(idx, 1);
+              }
+          } else if (targetPolice) {
+              const idx = this.policeChasers.indexOf(targetPolice);
+              if (idx !== -1) {
+                  this.physicsWorld.removeBody(targetPolice.body);
+                  this.scene.remove(targetPolice.mesh);
+                  this.policeChasers.splice(idx, 1);
+              }
           }
 
           this.scene.remove(missileGroup);
@@ -1020,8 +605,8 @@ export class GameModeEngine {
     this.quests = JSON.parse(JSON.stringify(questSet));
     this.currentQuestIndex = 0;
 
-    if (mode === 'UFO' && this.posY < 25) {
-      this.posY = 32;
+    if (mode === 'UFO' && this.posY < 60) {
+      this.posY = 85;
     } else if (mode === 'Alien') {
       this.posY = CONFIG.FLOOR_Y + 1.2;
     }
@@ -1079,9 +664,6 @@ export class GameModeEngine {
         e.preventDefault();
       }
 
-      if (e.code === 'KeyF') {
-        this.triggerAction();
-      }
       if (e.code === 'KeyR') {
         this.triggerBarrelRoll();
       }
@@ -1123,25 +705,29 @@ export class GameModeEngine {
   public triggerAction() {
     if (!this.isActive) return;
     if (this.playerMode === 'UFO') {
-      if (this.weaponMode === 'tractor') {
-        this.audio.playLaserSound();
-        this.screenShake = 0.8;
-        if (this.tractorBeamMesh) {
-          (this.tractorBeamMesh.material as THREE.MeshBasicMaterial).opacity = 0.85;
-        }
-        this.attemptAbduction();
-        this.spawnEMPWave();
-      } else if (this.weaponMode === 'repulsor') {
-        this.fireRepulsorPulse();
-      } else if (this.weaponMode === 'disintegrator') {
-        this.fireDisintegratorRay();
-      } else if (this.weaponMode === 'vortex') {
-        this.triggerGravitationalVortex();
-      } else if (this.weaponMode === 'orbital_laser') {
-        this.fireOrbitalLaser();
-      }
-      if (this.interceptorJets.length > 0 || this.policeChasers.length > 0) {
+      if (this.flightMode === 'jet') {
         this.fireHomingTorpedoes();
+      } else {
+        if (this.weaponMode === 'tractor') {
+          this.audio.playLaserSound();
+          this.screenShake = 0.8;
+          if (this.tractorBeamMesh) {
+            (this.tractorBeamMesh.material as THREE.MeshBasicMaterial).opacity = 0.85;
+          }
+          this.attemptAbduction();
+          this.spawnEMPWave();
+        } else if (this.weaponMode === 'repulsor') {
+          this.fireRepulsorPulse();
+        } else if (this.weaponMode === 'disintegrator') {
+          this.fireDisintegratorRay();
+        } else if (this.weaponMode === 'vortex') {
+          this.triggerGravitationalVortex();
+        } else if (this.weaponMode === 'orbital_laser') {
+          this.fireOrbitalLaser();
+        }
+        if (this.interceptorJets.length > 0 || this.policeChasers.length > 0) {
+          this.fireHomingTorpedoes();
+        }
       }
     } else {
       this.interactAsAlien();
@@ -1410,7 +996,13 @@ export class GameModeEngine {
   }
 
   // --- AIR FORCE INTERCEPTOR JETS ---
-  private interceptorJets: Array<{ mesh: THREE.Group; posX: number; posY: number; posZ: number; angle: number; shootTimer: number }> = [];
+  private interceptorJets: Array<{ 
+    mesh: THREE.Group; 
+    posX: number; posY: number; posZ: number; 
+    velX: number; velY: number; velZ: number;
+    pitch: number; yaw: number; roll: number;
+    shootTimer: number; 
+  }> = [];
 
   private updateInterceptorJets(deltaTime: number) {
     if (this.wantedLevel >= 2 && this.interceptorJets.length < Math.min(5, this.wantedLevel)) {
@@ -1426,9 +1018,9 @@ export class GameModeEngine {
 
       jetGroup.add(bodyMesh, wingMesh);
       const angle = Math.random() * Math.PI * 2;
-      const posX = this.posX + Math.cos(angle) * 80;
-      const posZ = this.posZ + Math.sin(angle) * 80;
-      const posY = CONFIG.FLOOR_Y + 30 + Math.random() * 20;
+      const posX = this.posX + Math.cos(angle) * 200;
+      const posZ = this.posZ + Math.sin(angle) * 200;
+      const posY = CONFIG.FLOOR_Y + 50 + Math.random() * 50;
 
       jetGroup.position.set(posX, posY, posZ);
       this.scene.add(jetGroup);
@@ -1438,29 +1030,101 @@ export class GameModeEngine {
         posX,
         posY,
         posZ,
-        angle,
+        velX: 0, velY: 0, velZ: 0,
+        pitch: 0, yaw: angle + Math.PI, roll: 0,
         shootTimer: 0
       });
     }
 
     for (let i = this.interceptorJets.length - 1; i >= 0; i--) {
       const jet = this.interceptorJets[i];
-      jet.angle += deltaTime * 0.8;
-      const radius = 60;
-      jet.posX = this.posX + Math.cos(jet.angle) * radius;
-      jet.posZ = this.posZ + Math.sin(jet.angle) * radius;
+      
+      // Calculate vector to player
+      const dx = this.posX - jet.posX;
+      const dy = this.posY - jet.posY;
+      const dz = this.posZ - jet.posZ;
+      const distToPlayer = Math.hypot(dx, dy, dz);
+
+      // Jet AI dogfighting logic
+      const targetSpeed = 80;
+      
+      if (this.flightMode === 'jet') {
+          // Advanced Dogfighting AI
+          // Calculate heading to player
+          const targetYaw = Math.atan2(dx, dz);
+          // Calculate pitch to player
+          const horizDist = Math.hypot(dx, dz);
+          const targetPitch = -Math.atan2(dy, horizDist);
+
+          // Turn towards player smoothly
+          let yawDiff = targetYaw - jet.yaw;
+          while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
+          while (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
+          jet.yaw += Math.sign(yawDiff) * Math.min(Math.abs(yawDiff), 2.0 * deltaTime);
+          
+          let pitchDiff = targetPitch - jet.pitch;
+          jet.pitch += Math.sign(pitchDiff) * Math.min(Math.abs(pitchDiff), 2.0 * deltaTime);
+
+          // Bank (roll) into turns
+          const targetRoll = -yawDiff * 2.0;
+          jet.roll = THREE.MathUtils.lerp(jet.roll, targetRoll, 4.0 * deltaTime);
+
+          // Move forward based on orientation
+          const forward = new THREE.Vector3(0, 0, 1).applyEuler(new THREE.Euler(jet.pitch, jet.yaw, jet.roll, 'YXZ'));
+          jet.velX = forward.x * targetSpeed;
+          jet.velY = forward.y * targetSpeed;
+          jet.velZ = forward.z * targetSpeed;
+          
+          // Evasive maneuvers if too close
+          if (distToPlayer < 50) {
+              jet.velX += Math.cos(performance.now() * 0.001) * 30;
+              jet.velY += Math.sin(performance.now() * 0.002) * 30;
+          }
+      } else {
+          // Simple Orbit AI for when player is hovering
+          jet.yaw += deltaTime * 0.8;
+          const radius = 60 + Math.sin(performance.now() * 0.001 + i) * 20;
+          const targetPosX = this.posX + Math.cos(jet.yaw) * radius;
+          const targetPosZ = this.posZ + Math.sin(jet.yaw) * radius;
+          const targetPosY = this.posY + 15 + Math.sin(performance.now() * 0.002 + i) * 10;
+          
+          jet.velX = (targetPosX - jet.posX) * 2.0;
+          jet.velY = (targetPosY - jet.posY) * 2.0;
+          jet.velZ = (targetPosZ - jet.posZ) * 2.0;
+          
+          // Look tangentially
+          jet.yaw = Math.atan2(jet.velX, jet.velZ);
+          jet.pitch = 0;
+          jet.roll = -0.5; // Bank into the turn
+      }
+
+      jet.posX += jet.velX * deltaTime;
+      jet.posY += jet.velY * deltaTime;
+      jet.posZ += jet.velZ * deltaTime;
+      
+      // Enforce floor
+      if (jet.posY < CONFIG.FLOOR_Y + 10) jet.posY = CONFIG.FLOOR_Y + 10;
+
       jet.mesh.position.set(jet.posX, jet.posY, jet.posZ);
-      jet.mesh.rotation.y = -jet.angle;
+      jet.mesh.rotation.set(jet.pitch, jet.yaw, jet.roll, 'YXZ');
 
       jet.shootTimer += deltaTime;
-      if (jet.shootTimer >= 1.5) {
+      
+      // Only shoot if roughly pointed at player and within range
+      const toPlayer = new THREE.Vector3(dx, dy, dz).normalize();
+      const jetForward = new THREE.Vector3(0, 0, 1).applyEuler(new THREE.Euler(jet.pitch, jet.yaw, jet.roll, 'YXZ'));
+      const dot = jetForward.dot(toPlayer);
+
+      if (jet.shootTimer >= (this.flightMode === 'jet' ? 1.0 : 1.5) && distToPlayer < 300 && dot > 0.8) {
         jet.shootTimer = 0;
         this.audio.playLaserSound();
         const tracerGeo = new THREE.CylinderGeometry(0.1, 0.1, 8, 8);
         const tracerMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
         const tracer = new THREE.Mesh(tracerGeo, tracerMat);
         tracer.position.set(jet.posX, jet.posY, jet.posZ);
-        tracer.lookAt(this.posX, this.posY, this.posZ);
+        
+        // Shoot slightly ahead of player (leading target)
+        tracer.lookAt(this.posX + this.velX * 0.5, this.posY + this.velY * 0.5, this.posZ + this.velZ * 0.5);
         tracer.rotation.x += Math.PI / 2;
         this.scene.add(tracer);
 
@@ -2301,50 +1965,169 @@ export class GameModeEngine {
       ) {
         ascendInput -= 1;
       }
-      
-      const forceY = ascendInput * 12000; 
 
-      // Directly sync CANNON body velocity with our kinematic movement vector
-      this.ufoBody.velocity.x = this.velX;
-      this.ufoBody.velocity.z = this.velZ;
-
-      // Counteract gravity completely for hover stability
-      const antiGravity = 9.81 * this.ufoBody.mass;
-      this.ufoBody.applyForce(new CANNON.Vec3(0, forceY + antiGravity, 0), this.ufoBody.position);
-
-      if (ascendInput === 0) {
-        this.ufoBody.velocity.y *= 0.88;
-      }
-
-      // Read state back from physics
-      this.posX = this.ufoBody.position.x;
-      this.posY = Math.max(3.0, Math.min(150.0, this.ufoBody.position.y));
-      this.ufoBody.position.y = this.posY;
-      this.posZ = this.ufoBody.position.z;
-
-      this.velY = this.ufoBody.velocity.y;
-
-      const hoverBob = Math.sin(performance.now() * 0.003) * 0.05;
-      this.posY += hoverBob;
-
-      if (this.barrelRollCooldown > 0) {
-        this.barrelRollCooldown -= deltaTime;
-      }
-
-      // Smooth Flight Aerodynamic Banking & Barrel Roll
-      if (this.barrelRollTimer > 0) {
-        this.barrelRollTimer -= deltaTime;
-        const progress = 1 - Math.max(0, this.barrelRollTimer / 0.5);
-        this.currentRollAngle = progress * Math.PI * 2;
-        this.currentPitchAngle = Math.sin(progress * Math.PI) * 0.3;
+      // Check Flight Mode Toggle
+      if (this.keys['KeyF'] || this.keys['f']) {
+        if (!this.keys['F_PRESSED']) {
+          this.flightMode = this.flightMode === 'hover' ? 'jet' : 'hover';
+          if (this.flightMode === 'jet') {
+             this.audio.playWindBoostSound(); // "Engage" sound
+             this.jetPitch = 0;
+             this.jetRoll = 0;
+             this.jetThrottle = Math.max(0.2, Math.hypot(this.velX, this.velY, this.velZ) / maxSpeed); // Convert current speed to throttle
+          } else {
+             // Returning to hover mode, zero out jet forces and re-level
+             this.currentRollAngle = 0;
+             this.currentPitchAngle = 0;
+          }
+          this.keys['F_PRESSED'] = true;
+        }
       } else {
-        const targetBank = -inputStrafe * 0.35 - (this.velX * 0.01);
-        const targetPitch = inputFwd * 0.20 + (this.velZ * 0.01);
-        this.currentRollAngle = THREE.MathUtils.lerp(this.currentRollAngle, targetBank, 0.15);
-        this.currentPitchAngle = THREE.MathUtils.lerp(this.currentPitchAngle, targetPitch, 0.15);
+        this.keys['F_PRESSED'] = false;
       }
 
-      this.playerGroup.rotation.set(this.currentPitchAngle, this.rotY, this.currentRollAngle);
+      if (this.flightMode === 'hover') {
+        // --- HOVER MODE (2.5x Supercharged Altitude Movement) ---
+        const climbSpeedMult = 2.5 * (1 + this.upgrades.engineSpeed * 0.25);
+        const forceY = ascendInput * 30000 * climbSpeedMult; 
+
+        // Directly sync CANNON body velocity with our kinematic movement vector
+        this.ufoBody.velocity.x = this.velX;
+        this.ufoBody.velocity.z = this.velZ;
+
+        if (ascendInput !== 0) {
+          this.ufoBody.velocity.y += ascendInput * 45.0 * climbSpeedMult * deltaTime;
+        } else {
+          this.ufoBody.velocity.y *= 0.82;
+        }
+
+        // Counteract gravity completely for hover stability
+        const antiGravity = 9.81 * this.ufoBody.mass;
+        this.ufoBody.applyForce(new CANNON.Vec3(0, forceY + antiGravity, 0), this.ufoBody.position);
+
+        // Read state back from physics
+        this.posX = this.ufoBody.position.x;
+        this.posY = Math.max(3.0, Math.min(350.0, this.ufoBody.position.y));
+        this.ufoBody.position.y = this.posY;
+        this.posZ = this.ufoBody.position.z;
+
+        this.velY = this.ufoBody.velocity.y;
+
+        const hoverBob = Math.sin(performance.now() * 0.003) * 0.05;
+        this.posY += hoverBob;
+
+        if (this.barrelRollCooldown > 0) {
+          this.barrelRollCooldown -= deltaTime;
+        }
+
+        // Smooth Flight Aerodynamic Banking & Barrel Roll
+        if (this.barrelRollTimer > 0) {
+          this.barrelRollTimer -= deltaTime;
+          const progress = 1 - Math.max(0, this.barrelRollTimer / 0.5);
+          this.currentRollAngle = progress * Math.PI * 2;
+          this.currentPitchAngle = Math.sin(progress * Math.PI) * 0.3;
+        } else {
+          const targetBank = -inputStrafe * 0.35 - (this.velX * 0.01);
+          const targetPitch = inputFwd * 0.20 + (this.velZ * 0.01);
+          this.currentRollAngle = THREE.MathUtils.lerp(this.currentRollAngle, targetBank, 0.15);
+          this.currentPitchAngle = THREE.MathUtils.lerp(this.currentPitchAngle, targetPitch, 0.15);
+        }
+
+        this.playerGroup.rotation.set(this.currentPitchAngle, this.rotY, this.currentRollAngle);
+      } else {
+        // --- JET FLIGHT SIM MODE ---
+        // Decouple from basic velocity vector, use true forces & aerodynamics
+
+        if (this.barrelRollCooldown > 0) {
+          this.barrelRollCooldown -= deltaTime;
+        }
+
+        let rollOffset = 0;
+        let pitchOffset = 0;
+        if (this.barrelRollTimer > 0) {
+          this.barrelRollTimer -= deltaTime;
+          const progress = 1 - Math.max(0, this.barrelRollTimer / 0.5);
+          rollOffset = progress * Math.PI * 2;
+          pitchOffset = Math.sin(progress * Math.PI) * 0.3;
+        }
+
+        // Throttle Control (W/S or Up/Down)
+        this.jetThrottle += inputFwd * deltaTime * 0.5; 
+        if (isBoost) this.jetThrottle = 1.2;
+        this.jetThrottle = Math.max(0.05, Math.min(1.5, this.jetThrottle)); // Allow up to 1.5 for barrel roll boost
+
+        // Pitch Control (Ascend/Descend mapped to pitch - 2.5x quicker)
+        const pitchInput = -ascendInput; // Invert so ascend pulls nose UP
+        this.jetPitch = THREE.MathUtils.lerp(this.jetPitch, pitchInput * 1.2, 7.5 * deltaTime);
+        
+        // Roll Control (A/D or Left/Right)
+        const rollInput = -inputStrafe;
+        this.jetRoll = THREE.MathUtils.lerp(this.jetRoll, rollInput * 1.5, 4.0 * deltaTime);
+        
+        // Yaw tied to roll (banking to turn)
+        this.rotY += Math.sin(this.jetRoll) * deltaTime * 0.8;
+
+        // --- Flight Physics Forces ---
+        const thrustForce = this.jetThrottle * (isBoost ? 35000 : 25000);
+        
+        // Forward vector based on current rotation (including barrel roll offsets for visuals, but we use base for physics so it doesn't spiral out)
+        const forward = new THREE.Vector3(0, 0, 1).applyEuler(new THREE.Euler(this.jetPitch, this.rotY, this.jetRoll, 'YXZ'));
+        
+        // Lift vector (points "up" relative to the jet)
+        const up = new THREE.Vector3(0, 1, 0).applyEuler(new THREE.Euler(this.jetPitch, this.rotY, this.jetRoll, 'YXZ'));
+        
+        // Calculate current forward speed
+        const currentVelocity = new THREE.Vector3(this.ufoBody.velocity.x, this.ufoBody.velocity.y, this.ufoBody.velocity.z);
+        const speed = currentVelocity.length();
+        
+        // Lift calculation (proportional to square of speed, pointing "up" relative to wings)
+        // Adjust lift coefficient so that normal cruising speed roughly counteracts gravity
+        const liftCoef = 1.8;
+        const liftMag = liftCoef * speed * speed;
+        const liftForce = up.clone().multiplyScalar(liftMag);
+
+        // Drag calculation (proportional to square of speed, pointing opposite to velocity)
+        const dragCoef = 0.4;
+        const dragForce = currentVelocity.clone().normalize().multiplyScalar(-dragCoef * speed * speed);
+
+        // Apply Forces
+        const totalForce = new CANNON.Vec3(
+            (forward.x * thrustForce) + liftForce.x + dragForce.x,
+            (forward.y * thrustForce) + liftForce.y + dragForce.y,
+            (forward.z * thrustForce) + liftForce.z + dragForce.z
+        );
+
+        // We do NOT counteract gravity here; gravity applies naturally.
+        this.ufoBody.applyForce(totalForce, this.ufoBody.position);
+
+        // Artificial stabilization to prevent tumbling and enforce flight envelope
+        this.ufoBody.angularVelocity.set(0, 0, 0); // Lock angular physics, kinematic rotation
+        
+        // Dampen velocity sideways to simulate aerodynamic fins (we want velocity to align with forward vector over time)
+        const right = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(this.jetPitch, this.rotY, this.jetRoll, 'YXZ'));
+        const sidewaysSpeed = currentVelocity.dot(right);
+        this.ufoBody.velocity.x -= right.x * sidewaysSpeed * 0.05;
+        this.ufoBody.velocity.z -= right.z * sidewaysSpeed * 0.05;
+        // Minor pitch dampening for angle of attack correction
+        const verticalSpeed = currentVelocity.dot(up);
+        this.ufoBody.velocity.y -= up.y * verticalSpeed * 0.02;
+
+        // Read state back
+        this.posX = this.ufoBody.position.x;
+        this.posY = Math.max(3.0, Math.min(1000.0, this.ufoBody.position.y)); // Higher ceiling
+        this.ufoBody.position.y = this.posY;
+        this.posZ = this.ufoBody.position.z;
+        this.velX = this.ufoBody.velocity.x;
+        this.velY = this.ufoBody.velocity.y;
+        this.velZ = this.ufoBody.velocity.z;
+
+        // Update visual model rotation
+        this.playerGroup.rotation.set(this.jetPitch + pitchOffset, this.rotY, this.jetRoll + rollOffset);
+        
+        // Update variables so camera tracking and other logic holds up
+        this.currentPitchAngle = this.jetPitch + pitchOffset;
+        this.currentRollAngle = this.jetRoll + rollOffset;
+      }
 
       if (this.tractorBeamMesh) {
         const mat = this.tractorBeamMesh.material as THREE.MeshBasicMaterial;
@@ -2946,6 +2729,16 @@ export class GameModeEngine {
     // --- Cinematic Camera Auto-Pan & Smooth Motion Tracking ---
     if (this.userCamOverrideTimer > 0) {
       this.userCamOverrideTimer -= deltaTime;
+    } else if (this.flightMode === 'jet') {
+      // Jet Mode Camera - Locked behind tail like a flight simulator
+      const spd = Math.hypot(this.velX, this.velZ);
+      
+      // Look direction from rotation
+      const forward = new THREE.Vector3(0, 0, 1).applyEuler(new THREE.Euler(this.jetPitch, this.rotY, this.jetRoll, 'YXZ'));
+      const up = new THREE.Vector3(0, 1, 0).applyEuler(new THREE.Euler(this.jetPitch, this.rotY, this.jetRoll, 'YXZ'));
+      
+      this.camYaw = this.rotY + Math.PI; // Look from behind
+      this.camPitch = this.jetPitch + 0.1; // Slightly angled down to see plane
     } else if (this.isCinematicCamera) {
       const spd = Math.hypot(this.velX, this.velZ);
       if (spd > 0.04) {
@@ -2983,12 +2776,20 @@ export class GameModeEngine {
     const cy = this.posY + Math.sin(this.camPitch) * camDist + camHeight;
 
     // Smooth camera position tracking
-    this.camera.position.lerp(new THREE.Vector3(cx, cy, cz), 0.14);
+    this.camera.position.lerp(new THREE.Vector3(cx, cy, cz), this.flightMode === 'jet' ? 0.35 : 0.14);
 
     // Look cleanly at player position
-    const targetX = this.posX;
-    const targetY = this.posY + (this.playerMode === 'UFO' ? 1.0 : 1.5);
-    const targetZ = this.posZ;
+    let targetX = this.posX;
+    let targetY = this.posY + (this.playerMode === 'UFO' ? 1.0 : 1.5);
+    let targetZ = this.posZ;
+
+    if (this.flightMode === 'jet') {
+       // Look slightly ahead of the jet
+       const forward = new THREE.Vector3(0, 0, 1).applyEuler(new THREE.Euler(this.jetPitch, this.rotY, this.jetRoll, 'YXZ'));
+       targetX += forward.x * 20;
+       targetY += forward.y * 20;
+       targetZ += forward.z * 20;
+    }
 
     this.camera.lookAt(targetX, targetY, targetZ);
 
@@ -3022,6 +2823,33 @@ export class GameModeEngine {
         targetJetDist = Math.round(minDist);
       }
     }
+
+      // Enemy Jet tracking for HUD
+      const enemyJetsState = this.interceptorJets.map((jet, idx) => {
+        // Project position to screen roughly for HUD
+        const dx = jet.posX - this.posX;
+        const dz = jet.posZ - this.posZ;
+        const dy = jet.posY - this.posY;
+        const dist = Math.hypot(dx, dy, dz);
+        
+        const pos = new THREE.Vector3(jet.posX, jet.posY, jet.posZ);
+        pos.project(this.camera);
+        
+        let screenX = (pos.x * 0.5 + 0.5) * 100;
+        let screenY = (-(pos.y) * 0.5 + 0.5) * 100;
+        
+        const inView = pos.z < 1 && dist < 400;
+
+        return {
+          id: idx,
+          screenX,
+          screenY,
+          dist: dist,
+          isLocked: dist < 120 && targetJetName !== undefined && (this.interceptorJets.length > 0 && targetJetDist !== undefined && Math.abs(targetJetDist - dist) < 5), // simplified lock
+          lockProgress: dist < 150 ? 100 - (dist / 150) * 100 : 0,
+          inView
+        };
+      });
 
     if (this.onTelemetryUpdate) {
       this.onTelemetryUpdate({
@@ -3068,7 +2896,15 @@ export class GameModeEngine {
         isBarrelRolling: this.barrelRollTimer > 0,
         subagentProposal: "Atmospheric Weather Manipulator & Plasma Forcefield Shield",
         cityColliders: cityColliders,
-        lastInputDevice: this.lastInputDevice
+        lastInputDevice: this.lastInputDevice,
+        flightMode: this.flightMode,
+        jetSpeed: Math.round(currentSpeed * 2.237),
+        jetAltitude: Math.round(this.posY - CONFIG.FLOOR_Y),
+        jetThrottle: this.jetThrottle,
+        jetPitch: this.jetPitch,
+        jetRoll: this.jetRoll,
+        jetHeading: this.rotY,
+        enemyJetsState
       });
     }
   }

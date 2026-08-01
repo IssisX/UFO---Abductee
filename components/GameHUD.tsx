@@ -5,8 +5,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { PlayerMode, GameModeTelemetry, WeaponMode, MothershipUpgrades } from '../types';
-import { Rocket, User, Zap, Sparkles, X, Gauge, ArrowUp, RotateCw, Crown, Trophy, Target, Flame, Compass, ChevronUp, Video, Users, FlaskConical, Shield, Plus, Minus, Maximize2, Crosshair, Wrench, Coins, Cpu, RefreshCw } from 'lucide-react';
+import { Rocket, User, Zap, Sparkles, X, Gauge, ArrowUp, RotateCw, Crown, Trophy, Target, Flame, Compass, ChevronUp, Video, Users, FlaskConical, Shield, Plus, Minus, Maximize2, Crosshair, Wrench, Coins, Cpu, RefreshCw, Plane } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { SimpsonsTVCartoon } from './SimpsonsTVCartoon';
+import { UpgradesModal } from './hud/UpgradesModal';
 
 interface GameHUDProps {
   playerMode: PlayerMode;
@@ -269,7 +271,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const activeWeapon: WeaponMode = telemetry.weaponMode || 'tractor';
 
   return (
-    <div 
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5 }}
       onContextMenu={(e) => e.preventDefault()}
       className="fixed inset-0 z-50 pointer-events-none flex flex-col justify-between p-2 sm:p-4 select-none font-sans overflow-hidden touch-none"
     >
@@ -282,7 +288,12 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       <div className="relative z-10 flex items-start justify-between w-full max-w-7xl mx-auto gap-2">
         
         {/* Left: Mode & Vehicle Switcher & Controls Badge */}
-        <div className={`flex flex-col gap-1.5 transition-all duration-500 ease-out delay-75 transform ${isAnimateIn ? 'translate-y-0 opacity-100' : '-translate-y-12 -translate-x-12 opacity-0'}`}>
+        <motion.div 
+          initial={{ x: -50, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 100, delay: 0.1 }}
+          className="flex flex-col gap-1.5"
+        >
           <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md text-white border border-indigo-500/40 px-3 py-1.5 rounded-2xl shadow-xl flex items-center gap-2">
             <div className="p-1.5 bg-gradient-to-tr from-indigo-600 to-purple-600 rounded-xl shadow">
               {isUFO ? <Rocket className="text-cyan-300 animate-pulse" size={16} /> : <User className="text-lime-300 animate-bounce" size={16} />}
@@ -332,10 +343,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             <span className="font-bold">Subagent Proposal:</span>
             <span className="text-slate-200">{telemetry.subagentProposal || "Atmospheric Weather Manipulator & Plasma Forcefield Shield"}</span>
           </div>
-        </div>
+        </motion.div>
 
         {/* Center: Score, Credits, Energy & Wanted Level */}
-        <div className={`flex flex-col items-center gap-1 pointer-events-none transition-all duration-500 ease-out delay-0 transform ${isAnimateIn ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-16 opacity-0 scale-95'}`}>
+        <motion.div 
+          initial={{ y: -50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 100, delay: 0.2 }}
+          className="flex flex-col items-center gap-1 pointer-events-none"
+        >
           {/* Cinematic Cam Badge */}
           {telemetry.isCinematicCamera && (
             <div className="bg-purple-950/80 border border-purple-500/50 text-cyan-300 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-widest shadow flex items-center gap-1 animate-pulse">
@@ -399,10 +415,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               <span className="text-[9px] font-black font-mono text-slate-300">{telemetry.energy ?? 100}%</span>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Right: Upgrades Tab, Camera, Exit & Interactive Strategic Mini-map */}
-        <div className={`flex flex-col items-end gap-1.5 transition-all duration-500 ease-out delay-150 transform ${isAnimateIn ? 'translate-y-0 translate-x-0 opacity-100' : '-translate-y-12 translate-x-12 opacity-0'}`}>
+        <motion.div 
+          initial={{ x: 50, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 100, delay: 0.3 }}
+          className="flex flex-col items-end gap-1.5"
+        >
           <div className="flex items-center gap-1.5 pointer-events-auto">
             <button
               onClick={() => setInputPref(p => p === 'auto' ? 'keyboard' : p === 'keyboard' ? 'gamepad' : p === 'gamepad' ? 'touch' : 'auto')}
@@ -435,13 +456,6 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               </button>
             )}
 
-            {/* Exit Button */}
-            <button
-              onClick={onExitGameMode}
-              className="bg-rose-600/90 hover:bg-rose-500 text-white font-black text-[10px] px-2.5 py-1.5 rounded-xl shadow flex items-center gap-1 border border-rose-400/30 active:scale-95 transition-all"
-            >
-              <X size={12} /> Exit
-            </button>
           </div>
 
           {/* Simpsons CRT TV Frame */}
@@ -605,14 +619,20 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               })}
             </div>
           </div>
-          </div>
         </div>
-      </div>
+      </motion.div>
+    </div>
 
-      {/* --- CENTRAL RETICLE TARGET LOCK OVERLAY --- */}
+    {/* --- CENTRAL RETICLE TARGET LOCK OVERLAY --- */}
       {isUFO && (
-        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center gap-2 transition-all duration-500 ease-out transform ${isAnimateIn ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
-          <div className="relative w-28 h-28 sm:w-36 sm:h-36 flex items-center justify-center">
+        <AnimatePresence>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center gap-2"
+          >
+            <div className="relative w-28 h-28 sm:w-36 sm:h-36 flex items-center justify-center">
             <div
               className={`absolute inset-0 rounded-full border-2 transition-all duration-300 ${
                 telemetry.targetAlignmentState === 'ABDUCTING'
@@ -646,11 +666,17 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               )}
             </div>
           </div>
-        </div>
+          </motion.div>
+        </AnimatePresence>
       )}
 
       {/* --- BOTTOM WEAPONS HOTBAR & MOVEMENT JOYSTICKS --- */}
-      <div className="w-full max-w-7xl mx-auto flex items-end justify-between gap-2 mt-auto pointer-events-auto">
+      <motion.div 
+        initial={{ y: 50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 100, delay: 0.4 }}
+        className="w-full max-w-7xl mx-auto flex items-end justify-between gap-2 mt-auto pointer-events-auto"
+      >
         {/* Left Joystick or Keyboard Hint */}
         {deviceType === 'touch' ? (
           <div className="flex flex-col items-center gap-1 transition-all duration-500 ease-out transform pointer-events-auto">
@@ -680,7 +706,72 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         <div className="flex flex-col items-center gap-2 pointer-events-auto">
           {/* FLIGHT SIMULATOR ARTIFICIAL HORIZON & JET LOCK OVERLAY */}
           {isUFO && (
-            <div className="pointer-events-none mb-1 flex flex-col items-center justify-center gap-1">
+            <div className="pointer-events-none mb-1 flex flex-col items-center justify-center gap-1 w-full max-w-2xl relative">
+              
+              {telemetry.flightMode === 'jet' && (
+                <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none flex items-center justify-center">
+                  
+                  {/* Advanced Flight Sim HUD overlay */}
+                  <div className="absolute inset-0 flex justify-between items-center px-12 pb-24 text-cyan-400 font-mono text-xs opacity-70">
+                    
+                    {/* Left Speed/Throttle Ladder */}
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="text-cyan-200 font-bold bg-slate-900/40 px-2 py-0.5 rounded border border-cyan-500/50">
+                        SPD {telemetry.jetSpeed?.toString().padStart(3, '0')}
+                      </div>
+                      <div className="h-40 w-8 border-r-2 border-cyan-500/50 relative">
+                        {/* Ladder ticks */}
+                        {[...Array(5)].map((_, i) => (
+                           <div key={i} className="absolute right-0 w-3 h-px bg-cyan-500/50" style={{ bottom: `${i * 25}%` }} />
+                        ))}
+                        {/* Speed pointer */}
+                        <div 
+                           className="absolute right-0 w-4 h-2 border-y-4 border-l-4 border-r-0 border-transparent border-l-cyan-300 transition-all duration-100" 
+                           style={{ bottom: `${Math.min(100, Math.max(0, (telemetry.jetThrottle || 0) * 100))}%`, transform: 'translateY(50%)' }}
+                        />
+                      </div>
+                      <div className="text-[9px] text-cyan-500">THR {Math.round((telemetry.jetThrottle || 0) * 100)}%</div>
+                    </div>
+
+                    {/* Right Altitude Ladder */}
+                    <div className="flex flex-col items-start gap-1">
+                      <div className="text-cyan-200 font-bold bg-slate-900/40 px-2 py-0.5 rounded border border-cyan-500/50">
+                        ALT {telemetry.jetAltitude?.toString().padStart(4, '0')}
+                      </div>
+                      <div className="h-40 w-8 border-l-2 border-cyan-500/50 relative">
+                        {[...Array(5)].map((_, i) => (
+                           <div key={i} className="absolute left-0 w-3 h-px bg-cyan-500/50" style={{ bottom: `${i * 25}%` }} />
+                        ))}
+                        <div 
+                           className="absolute left-0 w-4 h-2 border-y-4 border-r-4 border-l-0 border-transparent border-r-cyan-300 transition-all duration-100" 
+                           style={{ bottom: `${((telemetry.jetAltitude || 0) % 1000) / 10}%`, transform: 'translateY(50%)' }}
+                        />
+                      </div>
+                      <div className="text-[9px] text-cyan-500">MSL (M)</div>
+                    </div>
+                  </div>
+
+                  {/* Enemy Jet Tracking Reticles */}
+                  {telemetry.enemyJetsState?.map(enemy => enemy.inView && (
+                    <div 
+                      key={enemy.id} 
+                      className={`fixed w-12 h-12 border ${enemy.isLocked ? 'border-rose-500' : 'border-amber-400'} rounded-full flex items-center justify-center transition-all duration-75`}
+                      style={{
+                        left: `${enemy.screenX}%`, 
+                        top: `${enemy.screenY}%`,
+                        transform: `translate(-50%, -50%) scale(${Math.max(0.3, Math.min(1.0, 100 / enemy.dist))})`,
+                        opacity: enemy.isLocked ? 1 : 0.6
+                      }}
+                    >
+                      {enemy.isLocked && <div className="absolute w-2 h-2 bg-rose-500 rounded-full animate-ping" />}
+                      <div className="absolute -bottom-4 text-[9px] font-mono font-bold whitespace-nowrap" style={{ color: enemy.isLocked ? '#f43f5e' : '#fbbf24' }}>
+                        {enemy.isLocked ? 'LOCKED' : 'TRACKING'} {Math.round(enemy.dist)}M
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Air Force Jet Target Lock Banner */}
               {telemetry.targetJetName && (
                 <div className="bg-slate-950/90 border-2 border-rose-500 text-rose-400 px-3 py-1 rounded-xl shadow-2xl flex items-center gap-2 animate-bounce pointer-events-auto">
@@ -690,7 +781,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                       AIR FORCE JET LOCK: {telemetry.targetJetName} ({telemetry.targetJetDist}M)
                     </span>
                     <span className="text-[9px] text-amber-300 font-mono">
-                      PRESS [F] TO LAUNCH HOMING PLASMA TORPEDO
+                      PRESS [L-CLICK] TO LAUNCH HOMING PLASMA TORPEDO
                     </span>
                   </div>
                 </div>
@@ -783,6 +874,13 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               </button>
             )}
 
+            {isFlying && deviceType === 'mouseKeyboard' && (
+              <div className="px-2.5 py-1.5 rounded-xl font-black text-xs shadow-xl flex items-center gap-1 border border-cyan-500/50 bg-slate-900/80 text-cyan-300">
+                <Plane size={14} />
+                <span>MODE: {telemetry.flightMode === 'jet' ? 'SIM' : 'HOVER'} [F]</span>
+              </div>
+            )}
+
             {/* Bio-Specimens Mutant Deployment Button */}
             <button
               disabled={(telemetry.bioSpecimens ?? 0) < 3}
@@ -833,14 +931,18 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               className="px-5 py-2 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-black text-xs rounded-xl shadow-xl flex items-center gap-1.5 border border-cyan-300 active:scale-95 transition-all"
             >
               <Zap size={15} className="animate-bounce" />
-              <span>FIRE {deviceType === 'mouseKeyboard' ? '[F]' : deviceType === 'gamepad' ? '[X]' : ''}</span>
+              <span>FIRE {deviceType === 'mouseKeyboard' ? '[L-CLICK]' : deviceType === 'gamepad' ? '[X]' : ''}</span>
             </button>
           </div>
         </div>
 
         {/* Right Camera Stick or Mouse Hint */}
         {deviceType === 'touch' ? (
-          <div className="flex flex-col items-center gap-1 transition-all duration-500 ease-out transform pointer-events-auto">
+          <motion.div 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="flex flex-col items-center gap-1 pointer-events-auto"
+          >
             <div
               ref={rightStickRef}
               onMouseDown={handleRightStart}
@@ -856,13 +958,13 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 <RotateCw size={16} />
               </div>
             </div>
-          </div>
+          </motion.div>
         ) : (
           <div className="bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-700 text-[10px] text-slate-200 font-bold shadow-lg">
             Hold [TAB] for Full Control Scheme
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* --- CONTROL SCHEME REFERENCE OVERLAY (TAB or Button Toggle) --- */}
       {(isTabPressed || showControlOverlay) && (
@@ -956,96 +1058,16 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         </div>
       )}
 
-      {/* --- MOTHERSHIP UPGRADES HUD DRAWER MODAL --- */}
-      {showUpgradesModal && (
-        <div className="fixed inset-0 z-50 pointer-events-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="relative w-full max-w-2xl bg-slate-900 border border-cyan-500/50 rounded-3xl p-6 text-white shadow-2xl flex flex-col gap-5">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-indigo-600 rounded-xl">
-                  <Wrench className="text-cyan-300" size={20} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-white">MOTHERSHIP UPGRADES BAY</h3>
-                  <p className="text-xs text-slate-400">Enhance cybernetic beam physics, thrusters & weapons</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-emerald-500/40 text-emerald-300 font-mono font-black text-sm flex items-center gap-1">
-                  <Coins size={14} /> {(telemetry.credits ?? 2500).toLocaleString()} CR
-                </div>
-                <button
-                  onClick={() => setShowUpgradesModal(false)}
-                  className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 hover:text-white"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Upgrade Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
-              {[
-                { key: 'beamForce', name: 'Tractor Beam Lift', desc: 'Increases abduction lifting force and pull speed.', icon: '🧲' },
-                { key: 'engineSpeed', name: 'Hyper-Thrusters', desc: 'Increases top speed and maneuverability.', icon: '🚀' },
-                { key: 'repulsorRadius', name: 'Repulsor Shockwave', desc: 'Expands kinetic blast radius & explosion force.', icon: '💥' },
-                { key: 'disintegratorPower', name: 'Disintegrator Ray', desc: 'Increases voxel dissolution & building melt rate.', icon: '⚡' },
-                { key: 'vortexRange', name: 'Grav-Vortex Cyclotron', desc: 'Expands orbital cyclone pull radius & spin torque.', icon: '🌀' },
-                { key: 'energyCore', name: 'Zero-Point Energy', desc: 'Increases max energy capacity & regen rate.', icon: '🔋' },
-              ].map((up) => {
-                const currentLvl = telemetry.upgrades?.[up.key as keyof MothershipUpgrades] ?? 1;
-                const cost = currentLvl * 1000;
-                const canAfford = (telemetry.credits ?? 2500) >= cost;
-                const isMax = currentLvl >= 5;
-
-                return (
-                  <div key={up.key} className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 flex flex-col justify-between gap-2">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-black text-white flex items-center gap-1.5">
-                          <span>{up.icon}</span> {up.name}
-                        </span>
-                        <span className="text-xs font-mono font-bold text-cyan-400 bg-slate-900 px-2 py-0.5 rounded-md border border-cyan-500/30">
-                          LVL {currentLvl}/5
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-400 mb-2">{up.desc}</p>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-900">
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map((lvl) => (
-                          <div
-                            key={lvl}
-                            className={`w-3 h-2 rounded-sm ${
-                              lvl <= currentLvl ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]' : 'bg-slate-800'
-                            }`}
-                          />
-                        ))}
-                      </div>
-
-                      <button
-                        disabled={isMax || !canAfford}
-                        onClick={() => onPurchaseUpgrade?.(up.key as keyof MothershipUpgrades)}
-                        className={`px-3 py-1.5 rounded-xl font-black text-xs font-mono transition-all ${
-                          isMax
-                            ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                            : canAfford
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg active:scale-95'
-                            : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
-                        }`}
-                      >
-                        {isMax ? 'MAXED' : `UPGRADE (${cost} CR)`}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Modals and Overlays */}
+      <AnimatePresence>
+        {showUpgradesModal && (
+          <UpgradesModal
+            telemetry={telemetry}
+            onClose={() => setShowUpgradesModal(false)}
+            onPurchaseUpgrade={onPurchaseUpgrade}
+          />
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };

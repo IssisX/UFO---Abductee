@@ -105,6 +105,16 @@ export interface RadarBlip {
   isTarget?: boolean;
 }
 
+export interface EnemyJetState {
+  id: number;
+  screenX: number;
+  screenY: number;
+  dist: number;
+  isLocked: boolean;
+  lockProgress: number;
+  inView: boolean;
+}
+
 export interface GameModeTelemetry {
   speed: number;
   altitude: number;
@@ -150,6 +160,16 @@ export interface GameModeTelemetry {
   subagentProposal?: string;
   cityColliders?: CityColliderData[];
   lastInputDevice?: 'keyboard' | 'gamepad';
+  
+  // Advanced Flight Sim Data
+  flightMode?: 'hover' | 'jet';
+  jetSpeed?: number;
+  jetAltitude?: number;
+  jetThrottle?: number;
+  jetPitch?: number;
+  jetRoll?: number;
+  jetHeading?: number;
+  enemyJetsState?: EnemyJetState[];
 }
 
 export interface GameModeState {

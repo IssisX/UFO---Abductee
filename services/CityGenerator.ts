@@ -100,10 +100,10 @@ export class CityGenerator {
     const birds: FlyingBird[] = [];
     const pedestrians: Pedestrian[] = [];
 
-    // City Dimensions
-    const gridSize = config?.gridSize ?? 9; // 9x9 block grid
-    const blockSize = config?.blockSize ?? 28; // width of each block
-    const roadWidth = config?.roadWidth ?? 10; // width of roads
+    // City Dimensions - Expanded Metropolis
+    const gridSize = config?.gridSize ?? 11; // 11x11 block grid (Expanded City)
+    const blockSize = config?.blockSize ?? 30; // width of each block
+    const roadWidth = config?.roadWidth ?? 11; // width of roads
     const halfCity = (gridSize * blockSize + (gridSize + 1) * roadWidth) / 2;
 
     const materialsMap = new Map<number, THREE.MeshStandardMaterial>();
@@ -290,26 +290,26 @@ export class CityGenerator {
         sidewalk.receiveShadow = true;
         cityGroup.add(sidewalk);
 
-        // Building Height & Style by District
-        let height = 20;
+        // Building Height & Style by District - High Skyline
+        let height = 24;
         let bodyColor = 0x334155;
         let windowColor = 0xfcd34d;
 
         if (district === 'COMMERCIAL') {
-          height = 42 + random() * 32;
+          height = 60 + random() * 50; // Skyscraper towers up to 110m!
           bodyColor = random() > 0.5 ? 0x0f172a : 0x1e1b4b;
           windowColor = random() > 0.4 ? 0x00f0ff : 0xf472b6;
         } else if (district === 'DOWNTOWN') {
-          height = 26 + random() * 24;
+          height = 38 + random() * 38; // Tall commercial blocks
           bodyColor = random() > 0.5 ? 0x1e293b : 0x334155;
           windowColor = random() > 0.5 ? 0xfcd34d : 0x38bdf8;
         } else if (district === 'RESIDENTIAL') {
-          height = 14 + random() * 14;
+          height = 18 + random() * 18;
           bodyColor = random() > 0.5 ? 0x475569 : 0x3f3f46;
           windowColor = 0xfbbf24;
         } else {
           // INDUSTRIAL
-          height = 10 + random() * 12;
+          height = 12 + random() * 16;
           bodyColor = 0x27272a;
           windowColor = 0x22c55e;
         }

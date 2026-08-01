@@ -1121,12 +1121,12 @@ export class VoxelEngine {
     }
     this.controls.enabled = false;
     
-    // Deep Atmospheric Overhaul (Cinematic Game Mode)
-    this.scene.background = new THREE.Color(0x060810);
-    this.scene.fog = new THREE.FogExp2(0x060810, 0.015);
-    this.bloomPass.strength = 1.0;
-    this.bloomPass.threshold = 0.4;
-    this.bloomPass.radius = 0.85;
+    // Sunset Magic Hour Atmospheric Overhaul
+    this.scene.background = new THREE.Color(0x1a0a2a);
+    this.scene.fog = new THREE.FogExp2(0x280e3d, 0.007);
+    this.bloomPass.strength = 1.35;
+    this.bloomPass.threshold = 0.32;
+    this.bloomPass.radius = 0.90;
 
     const voxelsToUse = customVoxels || this.getCurrentVoxels();
     this.gameModeEngine.start(playerMode, voxelsToUse);
@@ -1350,9 +1350,15 @@ export class VoxelEngine {
     return Array.from(colors);
   }
 
+  public dispose() {
+    this.cleanup();
+  }
+
   public cleanup() {
     cancelAnimationFrame(this.animationId);
-    this.container.removeChild(this.renderer.domElement);
+    if (this.renderer.domElement.parentNode === this.container) {
+      this.container.removeChild(this.renderer.domElement);
+    }
     this.renderer.dispose();
   }
 }
