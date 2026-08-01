@@ -38,6 +38,10 @@ export interface Pedestrian {
   maxPos: number;
   speed: number;
   sign: number;
+  isPanicked?: boolean;
+  panicTimer?: number;
+  panicDirX?: number;
+  panicDirZ?: number;
 }
 
 export interface CollectibleItem {
@@ -45,6 +49,18 @@ export interface CollectibleItem {
   pos: THREE.Vector3;
   type: 'crystal' | 'fish' | 'catnip' | 'feather' | 'thermal_ring' | 'bounce_pad' | 'nest' | 'trash_can';
 }
+
+export interface CityConfig {
+  seed?: number;
+  gridSize?: number;
+  blockSize?: number;
+  roadWidth?: number;
+  buildingHeightRange?: [number, number];
+  windowLightDensity?: number;
+  propDensity?: number;
+}
+
+export type DistrictType = 'COMMERCIAL' | 'DOWNTOWN' | 'RESIDENTIAL' | 'INDUSTRIAL' | 'CIVIC_PARK';
 
 export interface CityWorld {
   cityGroup: THREE.Group;
@@ -54,14 +70,26 @@ export interface CityWorld {
   birds: FlyingBird[];
   pedestrians: Pedestrian[];
   fountainMesh: THREE.InstancedMesh | null;
+  seed: number;
   dispose: () => void;
 }
 
 export class CityGenerator {
   /**
-   * Generates a 3D Voxel City Group with buildings, roads, parks, streetlights, moving cars, birds, pedestrians, and character-specific worlds!
+   * Generates a 3D Voxel City Group using deterministic PRNG seed and District variation
    */
-  public static generateVoxelCity(): CityWorld {
+  public static generateVoxelCity(config?: CityConfig): CityWorld {
+    const seed = config?.seed ?? 42891;
+    
+    // Mulberry32 PRNG for deterministic seed regeneration
+    let seedState = seed;
+    function random(): number {
+      let t = (seedState += 0x6D2B79F5);
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+
     const cityGroup = new THREE.Group();
     cityGroup.name = "VoxelCityGroup";
 
@@ -71,10 +99,10 @@ export class CityGenerator {
     const birds: FlyingBird[] = [];
     const pedestrians: Pedestrian[] = [];
 
-    // City Dimensions (9x9 block grid for vast flyable metropolis)
-    const gridSize = 9; // 9x9 block grid
-    const blockSize = 28; // width of each block
-    const roadWidth = 10; // width of roads
+    // City Dimensions
+    const gridSize = config?.gridSize ?? 9; // 9x9 block grid
+    const blockSize = config?.blockSize ?? 28; // width of each block
+    const roadWidth = config?.roadWidth ?? 10; // width of roads
     const halfCity = (gridSize * blockSize + (gridSize + 1) * roadWidth) / 2;
 
     const materialsMap = new Map<number, THREE.MeshStandardMaterial>();
@@ -82,10 +110,10 @@ export class CityGenerator {
       if (!materialsMap.has(colorHex)) {
         materialsMap.set(colorHex, new THREE.MeshStandardMaterial({
           color: colorHex,
-          roughness: emissive ? 0.2 : 0.6,
-          metalness: emissive ? 0.8 : 0.1,
+          roughness: emissive ? 0.2 : 0.65,
+          metalness: emissive ? 0.8 : 0.15,
           emissive: emissive ? colorHex : 0x000000,
-          emissiveIntensity: emissive ? 0.8 : 0.0
+          emissiveIntensity: emissive ? 0.85 : 0.0
         }));
       }
       return materialsMap.get(colorHex)!;
@@ -183,8 +211,26 @@ export class CityGenerator {
         const bx = startOffset + gx * (blockSize + roadWidth);
         const bz = startOffset + gz * (blockSize + roadWidth);
 
+        // Determine District Type based on grid coordinate
+        const mid = Math.floor(gridSize / 2);
+        const distFromCenter = Math.max(Math.abs(gx - mid), Math.abs(gz - mid));
+        const isCorner = (gx === 0 || gx === gridSize - 1) && (gz === 0 || gz === gridSize - 1);
+
+        let district: DistrictType = 'DOWNTOWN';
+        if (gx === mid && gz === mid) {
+          district = 'CIVIC_PARK';
+        } else if (isCorner) {
+          district = 'INDUSTRIAL';
+        } else if (distFromCenter <= 1) {
+          district = 'COMMERCIAL';
+        } else if (distFromCenter === 2) {
+          district = 'DOWNTOWN';
+        } else {
+          district = 'RESIDENTIAL';
+        }
+
         // Central Park in middle block
-        if (gx === Math.floor(gridSize / 2) && gz === Math.floor(gridSize / 2)) {
+        if (district === 'CIVIC_PARK') {
           // Park Grass
           const grassMat = getMaterial(0x16a34a);
           const grass = new THREE.Mesh(new THREE.BoxGeometry(blockSize, 0.4, blockSize), grassMat);
@@ -226,23 +272,40 @@ export class CityGenerator {
         }
 
         // Sidewalk Base for Building Block
-        const sidewalkMat = getMaterial(0x64748b);
+        const sidewalkColor = district === 'COMMERCIAL' ? 0x475569 : district === 'INDUSTRIAL' ? 0x334155 : 0x64748b;
+        const sidewalkMat = getMaterial(sidewalkColor);
         const sidewalk = new THREE.Mesh(new THREE.BoxGeometry(blockSize, 0.4, blockSize), sidewalkMat);
         sidewalk.position.set(bx, groundY + 0.2, bz);
         sidewalk.receiveShadow = true;
         cityGroup.add(sidewalk);
 
-        // Building Height & Style
-        const isCorner = (gx === 0 || gx === gridSize - 1) && (gz === 0 || gz === gridSize - 1);
-        const height = isCorner ? 38 + Math.random() * 25 : 20 + Math.random() * 32;
+        // Building Height & Style by District
+        let height = 20;
+        let bodyColor = 0x334155;
+        let windowColor = 0xfcd34d;
+
+        if (district === 'COMMERCIAL') {
+          height = 42 + random() * 32;
+          bodyColor = random() > 0.5 ? 0x0f172a : 0x1e1b4b;
+          windowColor = random() > 0.4 ? 0x00f0ff : 0xf472b6;
+        } else if (district === 'DOWNTOWN') {
+          height = 26 + random() * 24;
+          bodyColor = random() > 0.5 ? 0x1e293b : 0x334155;
+          windowColor = random() > 0.5 ? 0xfcd34d : 0x38bdf8;
+        } else if (district === 'RESIDENTIAL') {
+          height = 14 + random() * 14;
+          bodyColor = random() > 0.5 ? 0x475569 : 0x3f3f46;
+          windowColor = 0xfbbf24;
+        } else {
+          // INDUSTRIAL
+          height = 10 + random() * 12;
+          bodyColor = 0x27272a;
+          windowColor = 0x22c55e;
+        }
+
         const bWidth = blockSize - 4;
         const bDepth = blockSize - 4;
         const bY = groundY + height / 2 + 0.4;
-
-        // Building Colors
-        const isGlassTower = Math.random() > 0.4;
-        const bodyColor = isGlassTower ? (Math.random() > 0.5 ? 0x0f172a : 0x1e1b4b) : 0x334155;
-        const windowColor = isGlassTower ? 0x00f0ff : (Math.random() > 0.5 ? 0xfcd34d : 0xf472b6);
 
         // Main Building Structure
         const bMat = getMaterial(bodyColor);
@@ -262,7 +325,6 @@ export class CityGenerator {
         });
 
         // Glowing Windows Grid
-        const winCols = 3;
         const winRows = Math.floor(height / 4);
         
         for (let r = 1; r < winRows; r++) {
@@ -279,36 +341,42 @@ export class CityGenerator {
           }
         }
 
-        // Rooftop Collectibles & Props
+        // Rooftop Structures, Collectibles & Props
         const roofY = groundY + height + 0.4;
-        if (height > 28) {
-          // Helipad or Bird Nest
-          if (Math.random() > 0.5) {
+        
+        if (district === 'COMMERCIAL') {
+          // Helipad with glowing red H or Antenna
+          if (random() > 0.4) {
             addVoxel(bx, roofY + 0.2, bz, 0xef4444, 8, 0.2, 8);
             addVoxel(bx, roofY + 0.3, bz, 0xffffff, 4, 0.2, 1);
+            addVoxel(bx, roofY + 6, bz, 0x00f0ff, 0.4, 12, 0.4); // Radio spire
             createCollectible(new THREE.Vector3(bx, roofY + 2, bz), 'crystal');
           } else {
-            // Eagle Nest & Feather on Roof
             createCollectible(new THREE.Vector3(bx, roofY + 1.5, bz), 'feather');
             createCollectible(new THREE.Vector3(bx + 3, roofY + 0.2, bz + 3), 'bounce_pad');
           }
+        } else if (district === 'DOWNTOWN') {
+          // Water Tower or HVAC Box
+          addVoxel(bx - 3, roofY + 2.0, bz - 3, 0x78350f, 2.5, 3.5, 2.5); // Water tank
+          createCollectible(new THREE.Vector3(bx + 2, roofY + 0.2, bz + 2), 'bounce_pad');
+          createCollectible(new THREE.Vector3(bx, roofY + 1.0, bz), 'fish');
         } else {
-          // Lower roof - Cat Parkour Bounce Pad & Fish
+          // Residential / Industrial
           createCollectible(new THREE.Vector3(bx, roofY + 0.2, bz), 'bounce_pad');
-          createCollectible(new THREE.Vector3(bx - 3, roofY + 1.0, bz - 3), 'fish');
+          if (random() > 0.5) createCollectible(new THREE.Vector3(bx - 3, roofY + 1.0, bz - 3), 'catnip');
         }
 
-        // High Sky Thermal Rings & Feathers for Eagle overhead
-        if (Math.random() > 0.5) {
-          createCollectible(new THREE.Vector3(bx, roofY + 12 + Math.random() * 15, bz), 'thermal_ring');
-          createCollectible(new THREE.Vector3(bx + 12, roofY + 8 + Math.random() * 10, bz + 12), 'feather');
+        // High Sky Thermal Rings & Feathers overhead
+        if (random() > 0.5) {
+          createCollectible(new THREE.Vector3(bx, roofY + 12 + random() * 15, bz), 'thermal_ring');
+          createCollectible(new THREE.Vector3(bx + 12, roofY + 8 + random() * 10, bz + 12), 'feather');
         }
 
-        // Sidewalk Fish treats and Trash cans for Cat
-        if (Math.random() > 0.4) {
+        // Sidewalk Fish treats and Trash cans
+        if (random() > 0.4) {
           createCollectible(new THREE.Vector3(bx - bWidth / 2 - 1.5, groundY + 0.6, bz), 'fish');
         }
-        if (Math.random() > 0.4) {
+        if (random() > 0.4) {
           createCollectible(new THREE.Vector3(bx + bWidth / 2 + 1.5, groundY + 0.4, bz + 4), 'trash_can');
         }
 
@@ -324,14 +392,15 @@ export class CityGenerator {
           // Pole
           addVoxel(lo.x, groundY + 2.5, lo.z, 0x475569, 0.3, 4.5, 0.3);
           // Lamp Glow
-          addVoxel(lo.x, groundY + 5, lo.z, 0x00f0ff, 0.8, 0.8, 0.8);
+          const lampColor = district === 'COMMERCIAL' ? 0x00f0ff : district === 'RESIDENTIAL' ? 0xfbbf24 : 0x38bdf8;
+          addVoxel(lo.x, groundY + 5, lo.z, lampColor, 0.8, 0.8, 0.8);
         });
 
-        // Sidewalk Pedestrians (1 to 2 pedestrians per block)
-        const pedCount = Math.floor(Math.random() * 2) + 1;
+        // Sidewalk Pedestrians
+        const pedCount = Math.floor(random() * 2) + 1;
         for (let p = 0; p < pedCount; p++) {
           const pedGroup = new THREE.Group();
-          const pMat = getMaterial(Math.random() > 0.5 ? 0x38bdf8 : 0xf43f5e);
+          const pMat = getMaterial(random() > 0.5 ? 0x38bdf8 : 0xf43f5e);
           const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.4, 0.8), pMat);
           body.position.y = 0.7;
           const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), getMaterial(0xfde047));
@@ -342,9 +411,9 @@ export class CityGenerator {
           legR.position.set(0.2, -0.4, 0);
           pedGroup.add(body, head, legL, legR);
 
-          const isAlongX = Math.random() > 0.5;
-          const px = isAlongX ? bx + (Math.random() - 0.5) * (blockSize - 4) : bx + (blockSize / 2 - 1);
-          const pz = isAlongX ? bz + (blockSize / 2 - 1) : bz + (Math.random() - 0.5) * (blockSize - 4);
+          const isAlongX = random() > 0.5;
+          const px = isAlongX ? bx + (random() - 0.5) * (blockSize - 4) : bx + (blockSize / 2 - 1);
+          const pz = isAlongX ? bz + (blockSize / 2 - 1) : bz + (random() - 0.5) * (blockSize - 4);
           pedGroup.position.set(px, groundY + 0.4, pz);
           cityGroup.add(pedGroup);
 
@@ -355,8 +424,8 @@ export class CityGenerator {
             axisPos: isAlongX ? pz : px,
             minPos: (isAlongX ? bx : bz) - blockSize / 2 + 2,
             maxPos: (isAlongX ? bx : bz) + blockSize / 2 - 2,
-            speed: 0.08 + Math.random() * 0.04,
-            sign: Math.random() > 0.5 ? 1 : -1
+            speed: 0.08 + random() * 0.04,
+            sign: random() > 0.5 ? 1 : -1
           });
         }
       }
@@ -512,6 +581,7 @@ export class CityGenerator {
       birds,
       pedestrians,
       fountainMesh: null,
+      seed,
       dispose: () => {
         cityGroup.traverse(child => {
           if (child instanceof THREE.Mesh || child instanceof THREE.InstancedMesh) {

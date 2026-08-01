@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, SavedModel, VoxelData, AIModelId, AI_MODELS, AnimationState, PlayerMode } from '../types';
-import { Box, Bird, Cat, Rabbit, Users, Code2, Wand2, Hammer, FolderOpen, ChevronUp, FileJson, History, Play, Pause, Info, Wrench, Loader2, Cpu, Zap, Check, Trash2, SkipBack, SkipForward, Flame, Heart, Sparkles, Repeat, Layers, PlayCircle, FastForward, Gamepad2, Rocket } from 'lucide-react';
+import { Box, Bird, Cat, Rabbit, Users, User, Code2, Wand2, Hammer, FolderOpen, ChevronUp, FileJson, History, Play, Pause, Info, Wrench, Loader2, Cpu, Zap, Check, Trash2, SkipBack, SkipForward, Flame, Heart, Sparkles, Repeat, Layers, PlayCircle, FastForward, Gamepad2, Rocket } from 'lucide-react';
 
 interface UIOverlayProps {
   voxelCount: number;
@@ -21,9 +21,9 @@ interface UIOverlayProps {
   onSelectModel: (modelId: AIModelId) => void;
   onDismantle: () => void;
   onSupernova: () => void;
-  onRebuild: (type: 'Eagle' | 'Cat' | 'Rabbit' | 'Twins') => void;
+  onRebuild: (type: 'Alien' | 'UFO') => void;
   onRebuildCurrent: () => void;
-  onNewScene: (type: 'Eagle') => void;
+  onNewScene: (type: 'Alien' | 'UFO') => void;
   onSelectCustomBuild: (model: SavedModel) => void;
   onSelectCustomRebuild: (model: SavedModel) => void;
   onDeleteCustomBuild?: (index: number) => void;
@@ -43,7 +43,7 @@ interface UIOverlayProps {
   onToggleAnimInterpolation: () => void;
   onToggleAnimLoop: () => void;
   onAnimateCurrentModel: (type: 'fly' | 'walk' | 'pulse' | 'float' | 'spin') => void;
-  onSelectAnimatedPreset: (preset: 'AnimatedEagle' | 'AnimatedCat' | 'AnimatedHeart' | 'AnimatedUFO' | 'AnimatedFire') => void;
+  onSelectAnimatedPreset: (preset: 'AnimatedAlien' | 'AnimatedHeart' | 'AnimatedUFO' | 'AnimatedFire') => void;
 
   // Game Mode Props
   onEnterGameMode: (playerMode: PlayerMode) => void;
@@ -136,7 +136,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
   }, []);
   
   // Only show default presets if the current model is the original Eagle
-  const isEagle = currentBaseModel === 'Eagle';
+  const isAlien = currentBaseModel === 'Alien';
   const currentModelOption = AI_MODELS.find(m => m.id === selectedModel) || AI_MODELS[0];
 
   return (
@@ -153,15 +153,15 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                 color="indigo"
             >
                 <div className="px-2 py-1 text-xs font-bold text-slate-400 uppercase tracking-wider">STATIC BUILDS</div>
-                <DropdownItem onClick={() => onNewScene('Eagle')} icon={<Bird size={16}/>} label="Eagle" />
+                <DropdownItem onClick={() => onNewScene('Alien')} icon={<User size={16}/>} label="Gray Alien" />
+                <DropdownItem onClick={() => onNewScene('UFO')} icon={<Rocket size={16}/>} label="Cyber UFO" />
                 <DropdownItem onClick={onPromptCreate} icon={<Wand2 size={16}/>} label="New build" highlight />
                 <div className="h-px bg-slate-100 my-1" />
 
                 <div className="px-2 py-1 text-xs font-bold text-purple-600 uppercase tracking-wider flex items-center gap-1">
                   <Sparkles size={12} /> 3D ANIMATED MODELS
                 </div>
-                <DropdownItem onClick={() => onSelectAnimatedPreset('AnimatedEagle')} icon={<Bird size={16}/>} label="Flapping Eagle" highlight />
-                <DropdownItem onClick={() => onSelectAnimatedPreset('AnimatedCat')} icon={<Cat size={16}/>} label="Walking Cat" highlight />
+                <DropdownItem onClick={() => onSelectAnimatedPreset('AnimatedAlien')} icon={<User size={16}/>} label="Walking Gray Alien" highlight />
                 <DropdownItem onClick={() => onSelectAnimatedPreset('AnimatedHeart')} icon={<Heart size={16}/>} label="Pulsing Heart" highlight />
                 <DropdownItem onClick={() => onSelectAnimatedPreset('AnimatedUFO')} icon={<Sparkles size={16}/>} label="Hovering UFO" highlight />
                 <DropdownItem onClick={() => onSelectAnimatedPreset('AnimatedFire')} icon={<Flame size={16}/>} label="Dancing Campfire" highlight />
@@ -282,9 +282,8 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                   <div className="px-2 py-1 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
                     Explore 3D Voxel World
                   </div>
-                  <DropdownItem onClick={() => { onEnterGameMode('UFO'); setIsGameMenuOpen(false); }} icon={<Rocket size={16} className="text-cyan-500"/>} label="🛸 UFO City Flight" highlight />
-                  <DropdownItem onClick={() => { onEnterGameMode('Cat'); setIsGameMenuOpen(false); }} icon={<Cat size={16} className="text-amber-500"/>} label="🐱 Cat GTA World" highlight />
-                  <DropdownItem onClick={() => { onEnterGameMode('Eagle'); setIsGameMenuOpen(false); }} icon={<Bird size={16} className="text-emerald-500"/>} label="🦅 Eagle Aerial View" />
+                  <DropdownItem onClick={() => { onEnterGameMode('UFO'); setIsGameMenuOpen(false); }} icon={<Rocket size={16} className="text-cyan-500"/>} label="🛸 UFO City Abduction" highlight />
+                  <DropdownItem onClick={() => { onEnterGameMode('Alien'); setIsGameMenuOpen(false); }} icon={<User size={16} className="text-lime-500"/>} label="👽 Gray Alien Walk & Talk" highlight />
                   <DropdownItem onClick={() => { onEnterGameMode('Custom'); setIsGameMenuOpen(false); }} icon={<Box size={16} className="text-indigo-500"/>} label="📦 Fly Active Model" />
                 </div>
               )}

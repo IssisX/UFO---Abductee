@@ -5,11 +5,11 @@
 
 
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { AppState, SimulationVoxel, RebuildTarget, VoxelData, SavedModel, AnimationState, PlayerMode, GameModeTelemetry } from '../types';
+import { AppState, SimulationVoxel, RebuildTarget, VoxelData, SavedModel, AnimationState, PlayerMode, GameModeTelemetry, WeaponMode, MothershipUpgrades } from '../types';
 import { CONFIG, COLORS } from '../utils/voxelConstants';
 import { GameModeEngine } from './GameModeEngine';
 
@@ -490,7 +490,7 @@ export class VoxelEngine {
     });
   }
 
-  private getColorDist(c1: THREE.Color, hex2: number): number {
+  private getColorDist(c1: THREE.Color, hex2: number | string): number {
     const c2 = new THREE.Color(hex2);
     const dr = c1.r - c2.r;
     const dg = c1.g - c2.g;
@@ -1024,7 +1024,7 @@ export class VoxelEngine {
       this.updatePhysics();
       
       // Always draw during active animation, rotation, or dynamic physics state
-      if (this.state !== AppState.STABLE || this.controls.autoRotate || this.state === AppState.SUPERNOVA || (this.isPlayingAnimation && this.animationFrames.length > 1)) {
+      if (this.state !== AppState.STABLE || this.controls.autoRotate || (this.isPlayingAnimation && this.animationFrames.length > 1)) {
           this.draw();
       }
     }
@@ -1039,6 +1039,14 @@ export class VoxelEngine {
       this.instanceMesh.visible = false;
     }
     this.controls.enabled = false;
+    
+    // Deep Atmospheric Overhaul (Cinematic Game Mode)
+    this.scene.background = new THREE.Color(0x060810);
+    this.scene.fog = new THREE.FogExp2(0x060810, 0.015);
+    this.bloomPass.strength = 1.0;
+    this.bloomPass.threshold = 0.4;
+    this.bloomPass.radius = 0.85;
+
     const voxelsToUse = customVoxels || this.getCurrentVoxels();
     this.gameModeEngine.start(playerMode, voxelsToUse);
   }
@@ -1052,6 +1060,14 @@ export class VoxelEngine {
       this.instanceMesh.visible = true;
     }
     this.controls.enabled = true;
+    
+    // Revert to Studio Lighting Mode
+    this.scene.background = new THREE.Color(CONFIG.BG_COLOR);
+    this.scene.fog = new THREE.Fog(CONFIG.BG_COLOR, 80, 220);
+    this.bloomPass.strength = 0.25;
+    this.bloomPass.threshold = 0.85;
+    this.bloomPass.radius = 0.3;
+
     this.camera.position.set(40, 40, 80);
     this.controls.target.set(0, 5, 0);
     this.draw();
@@ -1083,6 +1099,22 @@ export class VoxelEngine {
 
   public triggerGameJump() {
     this.gameModeEngine.triggerJump();
+  }
+
+  public setGameWeaponMode(mode: WeaponMode) {
+    this.gameModeEngine.setWeaponMode(mode);
+  }
+
+  public purchaseGameUpgrade(key: keyof MothershipUpgrades): boolean {
+    return this.gameModeEngine.purchaseUpgrade(key);
+  }
+
+  public deployGameMutant(): boolean {
+    return this.gameModeEngine.deployMutant();
+  }
+
+  public triggerGameBarrelRoll(): boolean {
+    return this.gameModeEngine.triggerBarrelRoll();
   }
 
   public setOnGameTelemetryUpdate(cb: (t: GameModeTelemetry) => void) {

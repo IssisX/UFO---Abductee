@@ -119,137 +119,70 @@ export function proceduralAnimate(
 }
 
 export const Generators = {
-    Eagle: (): VoxelData[] => {
+    Alien: (): VoxelData[] => {
         const map = new Map<string, VoxelData>();
-        // Branch
-        for (let x = -8; x < 8; x++) {
-            const y = Math.sin(x * 0.2) * 1.5;
-            const z = Math.cos(x * 0.1) * 1.5;
-            generateSphere(map, x, y, z, 1.8, COLORS.WOOD);
-            if (Math.random() > 0.7) generateSphere(map, x, y + 2, z + (Math.random() - 0.5) * 3, 1.5, COLORS.GREEN);
-        }
-        // Body
-        const EX = 0, EY = 2, EZ = 2;
-        generateSphere(map, EX, EY + 6, EZ, 4.5, COLORS.DARK, 1.4);
-        // Chest
-        for (let x = EX - 2; x <= EX + 2; x++) for (let y = EY + 4; y <= EY + 9; y++) setBlock(map, x, y, EZ + 3, COLORS.LIGHT);
-        // Wings (Rough approximation)
-        for (let x of [-4, -3, 3, 4]) for (let y = EY + 4; y <= EY + 10; y++) for (let z = EZ - 2; z <= EZ + 3; z++) setBlock(map, x, y, z, COLORS.DARK);
-        // Tail
-        for (let x = EX - 2; x <= EX + 2; x++) for (let y = EY; y <= EY + 4; y++) for (let z = EZ - 5; z <= EZ - 3; z++) setBlock(map, x, y, z, COLORS.WHITE);
-        // Head
-        const HY = EY + 12, HZ = EZ + 1;
-        generateSphere(map, EX, HY, HZ, 2.8, COLORS.WHITE);
-        generateSphere(map, EX, HY - 2, HZ, 2.5, COLORS.WHITE);
-        // Talons
-        [[-2, 0], [-2, 1], [2, 0], [2, 1]].forEach(o => setBlock(map, EX + o[0], EY + o[1], EZ, COLORS.TALON));
-        // Beak
-        [[0, 1], [0, 2], [1, 1], [-1, 1]].forEach(o => setBlock(map, EX + o[0], HY, HZ + 2 + o[1], COLORS.GOLD));
-        setBlock(map, EX, HY - 1, HZ + 3, COLORS.GOLD);
-        // Eyes
-        [[-1.5, COLORS.BLACK], [1.5, COLORS.BLACK]].forEach(o => setBlock(map, EX + o[0], HY + 0.5, HZ + 1.5, o[1]));
-        [[-1.5, COLORS.WHITE], [1.5, COLORS.WHITE]].forEach(o => setBlock(map, EX + o[0], HY + 1.5, HZ + 1.5, o[1]));
+        const AY = CONFIG.FLOOR_Y + 1; const AX = 0, AZ = 0;
+        const ALIEN_GREY = 0x94a3b8;
+        const ALIEN_GREY_DARK = 0x64748b;
+        const EYE_BLACK = 0x020617;
+        const EYE_GLOW = 0x38bdf8;
+        const SUIT_DARK = 0x1e293b;
+        const RAY_GREEN = 0xa3e635;
 
-        return Array.from(map.values());
-    },
+        // Feet & Boots
+        generateSphere(map, AX - 1.5, AY + 0.5, AZ, 1.2, SUIT_DARK);
+        generateSphere(map, AX + 1.5, AY + 0.5, AZ, 1.2, SUIT_DARK);
 
-    Cat: (): VoxelData[] => {
-        const map = new Map<string, VoxelData>();
-        const CY = CONFIG.FLOOR_Y + 1; const CX = 0, CZ = 0;
-        // Paws
-        generateSphere(map, CX - 3, CY + 2, CZ, 2.2, COLORS.DARK, 1.2);
-        generateSphere(map, CX + 3, CY + 2, CZ, 2.2, COLORS.DARK, 1.2);
-        // Body
-        for (let y = 0; y < 7; y++) {
-            const r = 3.5 - (y * 0.2);
-            generateSphere(map, CX, CY + 2 + y, CZ, r, COLORS.DARK);
-            generateSphere(map, CX, CY + 2 + y, CZ + 2, r * 0.6, COLORS.WHITE);
+        // Slender Legs
+        for (let y = 1; y <= 5; y++) {
+            setBlock(map, AX - 1.2, AY + y, AZ, ALIEN_GREY);
+            setBlock(map, AX - 1.2, AY + y, AZ + 0.5, ALIEN_GREY);
+            setBlock(map, AX + 1.2, AY + y, AZ, ALIEN_GREY);
+            setBlock(map, AX + 1.2, AY + y, AZ + 0.5, ALIEN_GREY);
         }
-        // Legs
-        for (let y = 0; y < 5; y++) {
-            setBlock(map, CX - 1.5, CY + y, CZ + 3, COLORS.WHITE); setBlock(map, CX + 1.5, CY + y, CZ + 3, COLORS.WHITE);
-            setBlock(map, CX - 1.5, CY + y, CZ + 2, COLORS.WHITE); setBlock(map, CX + 1.5, CY + y, CZ + 2, COLORS.WHITE);
-        }
-        // Head
-        const CHY = CY + 9;
-        generateSphere(map, CX, CHY, CZ, 3.2, COLORS.LIGHT, 0.8);
-        // Ears
-        [[-2, 1], [2, 1]].forEach(side => {
-            setBlock(map, CX + side[0], CHY + 3, CZ, COLORS.DARK); setBlock(map, CX + side[0] * 0.8, CHY + 3, CZ + 1, COLORS.WHITE);
-            setBlock(map, CX + side[0], CHY + 4, CZ, COLORS.DARK);
-        });
-        // Tail
-        for (let i = 0; i < 12; i++) {
-            const a = i * 0.3, tx = Math.cos(a) * 4.5, tz = Math.sin(a) * 4.5;
-            if (tz > -2) { setBlock(map, CX + tx, CY, CZ + tz, COLORS.DARK); setBlock(map, CX + tx, CY + 1, CZ + tz, COLORS.DARK); }
-        }
-        // Face
-        setBlock(map, CX - 1, CHY + 0.5, CZ + 2.5, COLORS.GOLD); setBlock(map, CX + 1, CHY + 0.5, CZ + 2.5, COLORS.GOLD);
-        setBlock(map, CX - 1, CHY + 0.5, CZ + 3, COLORS.BLACK); setBlock(map, CX + 1, CHY + 0.5, CZ + 3, COLORS.BLACK);
-        setBlock(map, CX, CHY, CZ + 3, COLORS.TALON);
-        return Array.from(map.values());
-    },
 
-    Rabbit: (): VoxelData[] => {
-        const map = new Map<string, VoxelData>();
-        const LOG_Y = CONFIG.FLOOR_Y + 2.5;
-        const RX = 0, RZ = 0;
-        // Log
-        for (let x = -6; x <= 6; x++) {
-            const radius = 2.8 + Math.sin(x * 0.5) * 0.2;
-            generateSphere(map, x, LOG_Y, 0, radius, COLORS.DARK);
-            if (x === -6 || x === 6) generateSphere(map, x, LOG_Y, 0, radius - 0.5, COLORS.WOOD);
-            if (Math.random() > 0.8) setBlock(map, x, LOG_Y + radius, (Math.random() - 0.5) * 2, COLORS.GREEN);
+        // Torso / Body (Space Suit with glowing green chest reactor)
+        for (let y = 6; y <= 12; y++) {
+            const r = 2.2 - (y - 6) * 0.15;
+            generateSphere(map, AX, AY + y, AZ, r, ALIEN_GREY);
+            setBlock(map, AX, AY + y, AZ + 1.5, RAY_GREEN);
         }
-        // Body
-        const BY = LOG_Y + 2.5;
-        generateSphere(map, RX - 1.5, BY + 1.5, RZ - 1.5, 1.8, COLORS.WHITE);
-        generateSphere(map, RX + 1.5, BY + 1.5, RZ - 1.5, 1.8, COLORS.WHITE);
-        generateSphere(map, RX, BY + 2, RZ, 2.2, COLORS.WHITE, 0.8);
-        generateSphere(map, RX, BY + 2.5, RZ + 1.5, 1.5, COLORS.WHITE);
-        setBlock(map, RX - 1.2, BY, RZ + 2.2, COLORS.LIGHT); setBlock(map, RX + 1.2, BY, RZ + 2.2, COLORS.LIGHT);
-        setBlock(map, RX - 2.2, BY, RZ - 0.5, COLORS.WHITE); setBlock(map, RX + 2.2, BY, RZ - 0.5, COLORS.WHITE);
-        generateSphere(map, RX, BY + 1.5, RZ - 2.5, 1.0, COLORS.WHITE);
-        // Head
-        const HY = BY + 4.5; const HZ = RZ + 1;
-        generateSphere(map, RX, HY, HZ, 1.7, COLORS.WHITE);
-        generateSphere(map, RX - 1.1, HY - 0.5, HZ + 0.5, 1.0, COLORS.WHITE);
-        generateSphere(map, RX + 1.1, HY - 0.5, HZ + 0.5, 1.0, COLORS.WHITE);
-        // Ears
-        for (let y = 0; y < 5; y++) {
-            const curve = y * 0.2;
-            setBlock(map, RX - 0.8, HY + 1.5 + y, HZ - curve, COLORS.WHITE); setBlock(map, RX - 1.2, HY + 1.5 + y, HZ - curve, COLORS.WHITE);
-            setBlock(map, RX - 1.0, HY + 1.5 + y, HZ - curve + 0.5, COLORS.LIGHT);
-            setBlock(map, RX + 0.8, HY + 1.5 + y, HZ - curve, COLORS.WHITE); setBlock(map, RX + 1.2, HY + 1.5 + y, HZ - curve, COLORS.WHITE);
-            setBlock(map, RX + 1.0, HY + 1.5 + y, HZ - curve + 0.5, COLORS.LIGHT);
-        }
-        setBlock(map, RX - 0.8, HY + 0.2, HZ + 1.5, COLORS.BLACK); setBlock(map, RX + 0.8, HY + 0.2, HZ + 1.5, COLORS.BLACK);
-        setBlock(map, RX, HY - 0.5, HZ + 1.8, COLORS.TALON);
-        return Array.from(map.values());
-    },
 
-    Twins: (): VoxelData[] => {
-        const map = new Map<string, VoxelData>();
-        function buildMiniEagle(offsetX: number, offsetZ: number, mirror: boolean) {
-            // Branch
-            for (let x = -5; x < 5; x++) {
-                const y = Math.sin(x * 0.4) * 0.5;
-                generateSphere(map, offsetX + x, y, offsetZ, 1.2, COLORS.WOOD);
-                if (Math.random() > 0.8) generateSphere(map, offsetX + x, y + 1, offsetZ, 1, COLORS.GREEN);
-            }
-            const EX = offsetX, EY = 1.5, EZ = offsetZ;
-            generateSphere(map, EX, EY + 4, EZ, 3.0, COLORS.DARK, 1.4);
-            for (let x = EX - 1; x <= EX + 1; x++) for (let y = EY + 2; y <= EY + 6; y++) setBlock(map, x, y, EZ + 2, COLORS.LIGHT);
-            for (let x = EX - 1; x <= EX + 1; x++) for (let y = EY + 2; y <= EY + 3; y++) setBlock(map, x, y, EZ - 3, COLORS.WHITE);
-            for (let y = EY + 2; y <= EY + 6; y++) for (let z = EZ - 1; z <= EZ + 2; z++) { setBlock(map, EX - 3, y, z, COLORS.DARK); setBlock(map, EX + 3, y, z, COLORS.DARK); }
-            const HY = EY + 8, HZ = EZ + 1;
-            generateSphere(map, EX, HY, HZ, 2.0, COLORS.WHITE);
-            setBlock(map, EX, HY, HZ + 2, COLORS.GOLD); setBlock(map, EX, HY - 0.5, HZ + 2, COLORS.GOLD);
-            setBlock(map, EX - 1, HY + 0.5, HZ + 1, COLORS.BLACK); setBlock(map, EX + 1, HY + 0.5, HZ + 1, COLORS.BLACK);
-            setBlock(map, EX - 1, EY, EZ, COLORS.TALON); setBlock(map, EX + 1, EY, EZ, COLORS.TALON);
+        // Arms & Ray Blaster
+        for (let y = 8; y <= 11; y++) {
+            setBlock(map, AX - 2.2, AY + y, AZ, ALIEN_GREY);
+            setBlock(map, AX + 2.2, AY + y, AZ, ALIEN_GREY);
         }
-        buildMiniEagle(-10, 2, false);
-        buildMiniEagle(10, -2, true);
+        // Blaster in right hand
+        setBlock(map, AX + 2.5, AY + 8, AZ + 1, SUIT_DARK);
+        setBlock(map, AX + 2.5, AY + 8, AZ + 2, RAY_GREEN);
+
+        // Neck
+        setBlock(map, AX, AY + 13, AZ, ALIEN_GREY_DARK);
+        setBlock(map, AX, AY + 14, AZ, ALIEN_GREY);
+
+        // Massive Iconic Gray Alien Oval Head
+        const HEAD_Y = AY + 18;
+        generateSphere(map, AX, HEAD_Y, AZ, 3.8, ALIEN_GREY, 1.2);
+        generateSphere(map, AX, HEAD_Y + 1.5, AZ, 4.2, ALIEN_GREY, 0.9);
+
+        // Large Black Almond Eyes
+        // Left Eye
+        setBlock(map, AX - 1.8, HEAD_Y, AZ + 3.2, EYE_BLACK);
+        setBlock(map, AX - 1.5, HEAD_Y + 0.8, AZ + 3.2, EYE_BLACK);
+        setBlock(map, AX - 2.2, HEAD_Y - 0.8, AZ + 3.0, EYE_BLACK);
+        setBlock(map, AX - 1.5, HEAD_Y + 0.5, AZ + 3.3, EYE_GLOW);
+
+        // Right Eye
+        setBlock(map, AX + 1.8, HEAD_Y, AZ + 3.2, EYE_BLACK);
+        setBlock(map, AX + 1.5, HEAD_Y + 0.8, AZ + 3.2, EYE_BLACK);
+        setBlock(map, AX + 2.2, HEAD_Y - 0.8, AZ + 3.0, EYE_BLACK);
+        setBlock(map, AX + 1.5, HEAD_Y + 0.5, AZ + 3.3, EYE_GLOW);
+
+        // Small Slit Nostrils
+        setBlock(map, AX - 0.3, HEAD_Y - 1.5, AZ + 3.5, ALIEN_GREY_DARK);
+        setBlock(map, AX + 0.3, HEAD_Y - 1.5, AZ + 3.5, ALIEN_GREY_DARK);
+
         return Array.from(map.values());
     },
 
@@ -259,23 +192,11 @@ export const Generators = {
 
     // --- ANIMATED PRESETS ---
 
-    AnimatedEagle: (): SavedModel => {
-      const base = Generators.Eagle();
-      const frames = proceduralAnimate(base, 'fly', 6);
-      return {
-        name: 'Flapping Eagle',
-        data: frames[0],
-        frames,
-        fps: 6,
-        isAnimated: true
-      };
-    },
-
-    AnimatedCat: (): SavedModel => {
-      const base = Generators.Cat();
+    AnimatedAlien: (): SavedModel => {
+      const base = Generators.Alien();
       const frames = proceduralAnimate(base, 'walk', 6);
       return {
-        name: 'Walking Cat',
+        name: 'Walking Alien',
         data: frames[0],
         frames,
         fps: 6,

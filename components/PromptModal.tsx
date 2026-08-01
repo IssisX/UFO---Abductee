@@ -204,10 +204,9 @@ export const PromptModal: React.FC<PromptModalProps> = ({
           {/* Quick Preset Chips for inspiration */}
           <div className="flex flex-wrap gap-1.5 mb-3">
             {[
-              { label: '🦅 Flying Eagle', text: 'A Majestic Flying Eagle with flapping wings' },
-              { label: '🐱 Walking Cat', text: 'A Cute Walking Cat moving its legs and tail' },
+              { label: '👽 Gray Alien', text: 'A Walking Gray Alien with glowing eyes and ray blaster' },
+              { label: '🛸 Hovering UFO', text: 'A Hovering UFO with spinning LED perimeter lights and tractor beam' },
               { label: '💓 Pulsing Heart', text: 'A Glowing Pulsing Crystal Heart with orbiting embers' },
-              { label: '🛸 Hovering UFO', text: 'A Hovering UFO with spinning LED perimeter lights' },
               { label: '🔥 Campfire', text: 'A Dancing Campfire with flickering flames and rising sparks' }
             ].map((chip, idx) => (
               <button

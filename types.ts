@@ -66,7 +66,7 @@ export interface AnimationState {
   isLooping: boolean;
 }
 
-export type PlayerMode = 'UFO' | 'Cat' | 'Eagle' | 'Custom';
+export type PlayerMode = 'UFO' | 'Alien' | 'Custom';
 
 export interface Quest {
   id: string;
@@ -78,10 +78,30 @@ export interface Quest {
   reward: number;
 }
 
+export type WeaponMode = 'tractor' | 'repulsor' | 'disintegrator' | 'vortex' | 'orbital_laser';
+
+export interface MothershipUpgrades {
+  beamForce: number; // 1 to 5
+  engineSpeed: number; // 1 to 5
+  repulsorRadius: number; // 1 to 5
+  disintegratorPower: number; // 1 to 5
+  vortexRange: number; // 1 to 5
+  energyCore: number; // 1 to 5
+  mutagenEfficiency?: number; // 1 to 5
+}
+
+export interface CityColliderData {
+  x: number;
+  z: number;
+  width: number;
+  depth: number;
+  height: number;
+}
+
 export interface RadarBlip {
-  x: number; // relative X (-1 to +1)
-  z: number; // relative Z (-1 to +1)
-  type: 'crystal' | 'police' | 'car' | 'fish' | 'feather' | 'person';
+  x: number; // world X relative to player
+  z: number; // world Z relative to player
+  type: 'crystal' | 'police' | 'car' | 'fish' | 'feather' | 'person' | 'debris';
 }
 
 export interface GameModeTelemetry {
@@ -90,6 +110,8 @@ export interface GameModeTelemetry {
   posX: number;
   posY: number;
   posZ: number;
+  heading?: number; // radians (rotY)
+  camYaw?: number; // radians
   boostActive: boolean;
   actionActive: boolean;
   score: number;
@@ -105,6 +127,27 @@ export interface GameModeTelemetry {
   abductionTriggerTime?: number;
   alienTestLog?: string | null;
   nearestPedestrianDist?: number | null;
+  targetAlignmentState?: 'SEARCHING' | 'ALIGNING' | 'LOCK_STABLE' | 'ABDUCTING' | 'SUCCESS' | 'ALIGNMENT_LOST';
+  alignmentProgress?: number; // 0 to 100%
+  abductionProgress?: number; // 0 to 100%
+  targetName?: string;
+  alignmentWarning?: string | null;
+  physicsActive?: boolean;
+  debrisCount?: number;
+  weaponMode?: WeaponMode;
+  upgrades?: MothershipUpgrades;
+  credits?: number;
+  bioSpecimens?: number;
+  mutantsDeployed?: number;
+  interceptorJetsCount?: number;
+  targetJetName?: string;
+  targetJetDist?: number;
+  rollAngle?: number;
+  pitchAngle?: number;
+  gForce?: number;
+  isBarrelRolling?: boolean;
+  subagentProposal?: string;
+  cityColliders?: CityColliderData[];
 }
 
 export interface GameModeState {

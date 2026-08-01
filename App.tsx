@@ -4,7 +4,7 @@
 */
 
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { VoxelEngine } from './services/VoxelEngine';
 import { UIOverlay } from './components/UIOverlay';
 import { GameHUD } from './components/GameHUD';
@@ -61,7 +61,7 @@ const App: React.FC = () => {
 
   // --- State for Custom Models, Active AI Model & Animation ---
   const [selectedModel, setSelectedModel] = useState<AIModelId>(() => storageService.getSelectedModel());
-  const [currentBaseModel, setCurrentBaseModel] = useState<string>('Eagle');
+  const [currentBaseModel, setCurrentBaseModel] = useState<string>('Alien');
   const [customBuilds, setCustomBuilds] = useState<SavedModel[]>([]);
   const [customRebuilds, setCustomRebuilds] = useState<SavedModel[]>([]);
   const [animState, setAnimState] = useState<AnimationState>({
@@ -98,7 +98,7 @@ const App: React.FC = () => {
     engineRef.current = engine;
 
     // Initial Model Load
-    engine.loadInitialModel(Generators.Eagle());
+    engine.loadInitialModel(Generators.Alien());
 
     // Resize Listener
     const handleResize = () => engine.handleResize();
@@ -126,12 +126,12 @@ const App: React.FC = () => {
     engineRef.current?.dismantle();
   };
 
-  const handleNewScene = (type: 'Eagle') => {
+  const handleNewScene = (type: 'Alien' | 'UFO') => {
     const generator = Generators[type];
     if (generator && engineRef.current) {
       engineRef.current.clearAnimation();
       engineRef.current.loadInitialModel(generator());
-      setCurrentBaseModel('Eagle');
+      setCurrentBaseModel(type);
     }
   };
 
@@ -163,7 +163,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSelectAnimatedPreset = (presetName: 'AnimatedEagle' | 'AnimatedCat' | 'AnimatedHeart' | 'AnimatedUFO' | 'AnimatedFire') => {
+  const handleSelectAnimatedPreset = (presetName: 'AnimatedAlien' | 'AnimatedHeart' | 'AnimatedUFO' | 'AnimatedFire') => {
     if (Generators[presetName] && engineRef.current) {
       const savedModel = (Generators[presetName] as () => SavedModel)();
       engineRef.current.loadAnimatedModel(savedModel);
@@ -171,7 +171,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleRebuild = (type: 'Eagle' | 'Cat' | 'Rabbit' | 'Twins') => {
+  const handleRebuild = (type: 'Alien' | 'UFO') => {
     const generator = Generators[type];
     if (generator && engineRef.current) {
       engineRef.current.rebuild(generator());
@@ -443,49 +443,63 @@ const App: React.FC = () => {
     setIsGameMode(true);
     let voxels: VoxelData[] | undefined;
     if (mode === 'UFO') voxels = Generators.UFO();
-    else if (mode === 'Cat') voxels = Generators.Cat();
-    else if (mode === 'Eagle') voxels = Generators.Eagle();
+    else if (mode === 'Alien') voxels = Generators.Alien();
 
     engineRef.current?.startGameMode(mode, voxels);
   };
 
-  const handleExitGameMode = () => {
+  const handleExitGameMode = useCallback(() => {
     setIsGameMode(false);
     engineRef.current?.stopGameMode();
-  };
+  }, []);
 
-  const handleSelectPlayerMode = (mode: PlayerMode) => {
+  const handleSelectPlayerMode = useCallback((mode: PlayerMode) => {
     setPlayerMode(mode);
     let voxels: VoxelData[] | undefined;
     if (mode === 'UFO') voxels = Generators.UFO();
-    else if (mode === 'Cat') voxels = Generators.Cat();
-    else if (mode === 'Eagle') voxels = Generators.Eagle();
+    else if (mode === 'Alien') voxels = Generators.Alien();
 
     engineRef.current?.setPlayerMode(mode);
     if (voxels) {
       engineRef.current?.setPlayerVoxels(voxels);
     }
-  };
+  }, []);
 
-  const handleTriggerGameAction = () => {
+  const handleTriggerGameAction = useCallback(() => {
     engineRef.current?.triggerGameAction();
-  };
+  }, []);
 
-  const handleVirtualInput = (fwd: number, strafe: number, ascend: number = 0, boost: boolean = false) => {
+  const handleVirtualInput = useCallback((fwd: number, strafe: number, ascend: number = 0, boost: boolean = false) => {
     engineRef.current?.setGameVirtualInput(fwd, strafe, ascend, boost);
-  };
+  }, []);
 
-  const handleRotateCamera = (deltaYaw: number, deltaPitch: number = 0) => {
+  const handleRotateCamera = useCallback((deltaYaw: number, deltaPitch: number = 0) => {
     engineRef.current?.rotateGameCamera(deltaYaw, deltaPitch);
-  };
+  }, []);
 
-  const handleToggleCinematicCamera = () => {
+  const handleToggleCinematicCamera = useCallback(() => {
     engineRef.current?.toggleCinematicCamera();
-  };
+  }, []);
 
-  const handleJump = () => {
+  const handleJump = useCallback(() => {
     engineRef.current?.triggerGameJump();
-  };
+  }, []);
+
+  const handleSelectWeaponMode = useCallback((mode: any) => {
+    engineRef.current?.setGameWeaponMode(mode);
+  }, []);
+
+  const handlePurchaseUpgrade = useCallback((key: any) => {
+    return engineRef.current?.purchaseGameUpgrade(key) ?? false;
+  }, []);
+
+  const handleDeployMutant = useCallback(() => {
+    return engineRef.current?.deployGameMutant() ?? false;
+  }, []);
+
+  const handleBarrelRoll = useCallback(() => {
+    return engineRef.current?.triggerGameBarrelRoll() ?? false;
+  }, []);
 
   // Filter rebuilds to only show those relevant to the current base model
   const relevantRebuilds = customRebuilds.filter(
@@ -509,6 +523,10 @@ const App: React.FC = () => {
           onVirtualInput={handleVirtualInput}
           onRotateCamera={handleRotateCamera}
           onJump={handleJump}
+          onSelectWeaponMode={handleSelectWeaponMode}
+          onPurchaseUpgrade={handlePurchaseUpgrade}
+          onDeployMutant={handleDeployMutant}
+          onBarrelRoll={handleBarrelRoll}
         />
       ) : (
         /* UI Overlay */

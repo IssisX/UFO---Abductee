@@ -6,14 +6,16 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "lint": "tsc --noEmit",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.29.1",
+    "cannon-es": "^0.20.0",
+    "lucide-react": "^0.553.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "lucide-react": "^0.553.0",
-    "three": "^0.181.1",
-    "@google/genai": "^1.29.1"
+    "three": "^0.181.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
