@@ -1,3 +1,4 @@
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -163,6 +164,9 @@ export class VoxelEngine {
       return Array.from(voxelMap.values());
   }
 
+  private highResGeo = new RoundedBoxGeometry(CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05, 2, 0.08);
+  private lowResGeo = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05);
+
   private updateLODSystem() {
       // Calculate distance from camera to model center
       this.cameraDistance = this.camera.position.distanceTo(this.controls.target);
@@ -180,6 +184,11 @@ export class VoxelEngine {
 
       if (this.currentLodLevel !== desiredLevel && this.state === AppState.STABLE && !this.isPlayingAnimation) {
           this.currentLodLevel = desiredLevel;
+          
+          if (this.instanceMesh) {
+              this.instanceMesh.geometry = desiredLevel === 1 ? this.highResGeo : this.lowResGeo;
+          }
+
           // Apply LOD if available
           if (this.lodVoxels[desiredLevel]) {
               this.applyLodVoxels(this.lodVoxels[desiredLevel]);
@@ -516,14 +525,14 @@ export class VoxelEngine {
     this.lodVoxels[4] = this.generateLod(this.voxels, 4);
     this.currentLodLevel = -1;
 
-    const geometry = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05);
     const material = new THREE.MeshStandardMaterial({ 
       roughness: 0.4, 
       metalness: 0.1
     });
-    this.instanceMesh = new THREE.InstancedMesh(geometry, material, this.voxels.length);
+    this.instanceMesh = new THREE.InstancedMesh(this.highResGeo, material, this.voxels.length);
     this.instanceMesh.castShadow = true;
     this.instanceMesh.receiveShadow = true;
+    this.instanceMesh.frustumCulled = false;
     this.scene.add(this.instanceMesh);
 
     this.draw();
@@ -1219,7 +1228,7 @@ export class VoxelEngine {
           this.instanceMesh.material.dispose();
       }
     }
-    const geometry = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05);
+    const geometry = this.highResGeo;
     const material = new THREE.MeshStandardMaterial({ 
       roughness: 0.4, 
       metalness: 0.1
@@ -1228,6 +1237,7 @@ export class VoxelEngine {
     this.instanceMesh.count = 0;
     this.instanceMesh.castShadow = true;
     this.instanceMesh.receiveShadow = true;
+    this.instanceMesh.frustumCulled = false;
     this.scene.add(this.instanceMesh);
     
     this.state = AppState.STABLE;
@@ -1278,7 +1288,7 @@ export class VoxelEngine {
           this.ghostMesh.material.dispose();
       }
     }
-    const geometry = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05);
+    const geometry = this.highResGeo;
     const material = new THREE.MeshPhysicalMaterial({ 
         roughness: 0.2, 
         metalness: 0.9, 

@@ -1,3 +1,4 @@
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -120,13 +121,23 @@ export class CityGenerator {
     }
 
     const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-    const voxelInstancedMap = new Map<number, { pos: THREE.Vector3[]; scale: THREE.Vector3[] }>();
+    const roundedBoxGeo = new RoundedBoxGeometry(1, 1, 1, 2, 0.1);
+    
+    const CHUNK_SIZE = 64;
+    const chunkedVoxelMap = new Map<string, Map<number, { pos: THREE.Vector3[]; scale: THREE.Vector3[] }>>();
 
     function addVoxel(x: number, y: number, z: number, color: number, sx = 1, sy = 1, sz = 1) {
-      if (!voxelInstancedMap.has(color)) {
-        voxelInstancedMap.set(color, { pos: [], scale: [] });
+      const cx = Math.floor(x / CHUNK_SIZE);
+      const cz = Math.floor(z / CHUNK_SIZE);
+      const chunkKey = `${cx},${cz}`;
+      if (!chunkedVoxelMap.has(chunkKey)) {
+        chunkedVoxelMap.set(chunkKey, new Map());
       }
-      const item = voxelInstancedMap.get(color)!;
+      const voxelMap = chunkedVoxelMap.get(chunkKey)!;
+      if (!voxelMap.has(color)) {
+        voxelMap.set(color, { pos: [], scale: [] });
+      }
+      const item = voxelMap.get(color)!;
       item.pos.push(new THREE.Vector3(x, y, z));
       item.scale.push(new THREE.Vector3(sx, sy, sz));
     }
@@ -554,23 +565,55 @@ export class CityGenerator {
       });
     }
 
-    // --- 6. Build Instanced Voxels for Static City Decor ---
-    voxelInstancedMap.forEach((data, colorHex) => {
-      const mat = getMaterial(colorHex, colorHex === 0x00f0ff || colorHex === 0xef4444);
-      const instMesh = new THREE.InstancedMesh(boxGeo, mat, data.pos.length);
-      instMesh.castShadow = true;
-      instMesh.receiveShadow = true;
+    // --- 6. Build Instanced Voxels for Static City Decor using LOD chunks ---
+    chunkedVoxelMap.forEach((colorMap, chunkKey) => {
+      const lod = new THREE.LOD();
+      
+      const highGroup = new THREE.Group();
+      const lowGroup = new THREE.Group();
+      
+      const [cx, cz] = chunkKey.split(',').map(Number);
+      const centerX = cx * CHUNK_SIZE + (CHUNK_SIZE / 2);
+      const centerZ = cz * CHUNK_SIZE + (CHUNK_SIZE / 2);
+      lod.position.set(centerX, 0, centerZ);
 
-      const dummy = new THREE.Object3D();
-      for (let i = 0; i < data.pos.length; i++) {
-        dummy.position.copy(data.pos[i]);
-        dummy.scale.copy(data.scale[i]);
-        dummy.rotation.set(0, 0, 0);
-        dummy.updateMatrix();
-        instMesh.setMatrixAt(i, dummy.matrix);
-      }
-      instMesh.instanceMatrix.needsUpdate = true;
-      cityGroup.add(instMesh);
+      colorMap.forEach((data, colorHex) => {
+        const mat = getMaterial(colorHex, colorHex === 0x00f0ff || colorHex === 0xef4444);
+        
+        // High fidelity mesh uses RoundedBoxGeometry
+        const instHigh = new THREE.InstancedMesh(roundedBoxGeo, mat, data.pos.length);
+        instHigh.castShadow = true;
+        instHigh.receiveShadow = true;
+        instHigh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), CHUNK_SIZE);
+        
+        // Low fidelity mesh uses simple BoxGeometry
+        const instLow = new THREE.InstancedMesh(boxGeo, mat, data.pos.length);
+        instLow.castShadow = true;
+        instLow.receiveShadow = true;
+        instLow.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), CHUNK_SIZE);
+
+        const dummy = new THREE.Object3D();
+        for (let i = 0; i < data.pos.length; i++) {
+          // Calculate relative position within the chunk
+          dummy.position.copy(data.pos[i]);
+          dummy.position.x -= centerX;
+          dummy.position.z -= centerZ;
+          dummy.scale.copy(data.scale[i]);
+          dummy.rotation.set(0, 0, 0);
+          dummy.updateMatrix();
+          instHigh.setMatrixAt(i, dummy.matrix);
+          instLow.setMatrixAt(i, dummy.matrix);
+        }
+        instHigh.instanceMatrix.needsUpdate = true;
+        instLow.instanceMatrix.needsUpdate = true;
+        
+        highGroup.add(instHigh);
+        lowGroup.add(instLow);
+      });
+      
+      lod.addLevel(highGroup, 0);
+      lod.addLevel(lowGroup, 80); // Switch to simple boxes at 80 units away
+      cityGroup.add(lod);
     });
 
     return {

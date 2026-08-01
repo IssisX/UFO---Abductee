@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PlayerMode, GameModeTelemetry, VoxelData, Quest, WeaponMode, MothershipUpgrades } from '../types';
+import { PlayerMode, GameModeTelemetry, VoxelData, Quest, WeaponMode, MothershipUpgrades, RadarBlip } from '../types';
 import { CityGenerator, CityWorld, Pedestrian } from './CityGenerator';
 import { CONFIG } from '../utils/voxelConstants';
 import { SpatialHashGrid } from './SpatialHashGrid';
@@ -2682,21 +2682,21 @@ export class GameModeEngine {
 
     // --- Tractor Beam & Target Alignment Engine ---
     let alignmentWarning: string | null = null;
+    let closestPedTarget: Pedestrian | null = null;
     
     if (this.playerMode === 'UFO' && this.cityWorld) {
       // Find closest pedestrian target using O(1) Spatial Hash query
-      let closestPed: Pedestrian | null = null;
       let closestIdx = -1;
       let closestDist = Infinity;
 
       const nearestEntry = this.pedSpatialHash.queryNearest(this.posX, this.posZ, 25);
       if (nearestEntry) {
-        closestPed = nearestEntry.item;
+        closestPedTarget = nearestEntry.item;
         closestIdx = nearestEntry.id;
         closestDist = Math.hypot(nearestEntry.x - this.posX, nearestEntry.z - this.posZ);
       }
 
-      if (closestPed && closestDist < 22) {
+      if (closestPedTarget && closestDist < 22) {
         this.targetName = `CIVILIAN #${closestIdx + 101}`;
         const horizDist = closestDist;
         this.alignmentProgress = Math.max(0, Math.min(100, Math.round(100 * (1 - horizDist / 18))));
@@ -2736,7 +2736,7 @@ export class GameModeEngine {
         // Active Abduction 4.5s Sequence Execution
         if (this.targetAlignmentState === 'LOCK_STABLE' && !this.activeAbductee) {
           this.targetAlignmentState = 'ABDUCTING';
-          this.activeAbductee = closestPed;
+          this.activeAbductee = closestPedTarget;
           this.activeAbducteeIdx = closestIdx;
           this.abductionTimer = 0;
           this.audio.playAbductionSound();
@@ -2862,32 +2862,33 @@ export class GameModeEngine {
       }
     }
 
-    // --- Calculate Radar Blips (relative to player, max radius 80) ---
-    const radarBlips: { x: number; z: number; type: 'crystal' | 'police' | 'car' | 'fish' | 'feather' | 'person' }[] = [];
+    // --- Calculate Curated Strategic Radar Blips (relative to player, max radius 80) ---
+    const radarBlips: RadarBlip[] = [];
     const maxRadarDist = 80;
     let nearestPedDist: number | null = null;
 
     if (this.cityWorld) {
+      // 1. Collectibles (Top 4 closest)
+      const collectiblesSorted: { dx: number; dz: number; dist: number; type: RadarBlip['type'] }[] = [];
       for (const item of this.cityWorld.collectibleVoxels) {
         const dx = item.mesh.position.x - this.posX;
         const dz = item.mesh.position.z - this.posZ;
         const dist = Math.sqrt(dx * dx + dz * dz);
         if (dist <= maxRadarDist) {
           const blipType = item.type === 'fish' ? 'fish' : item.type === 'feather' ? 'feather' : 'crystal';
-          radarBlips.push({ x: dx / maxRadarDist, z: dz / maxRadarDist, type: blipType });
+          collectiblesSorted.push({ dx, dz, dist, type: blipType as RadarBlip['type'] });
         }
       }
-
-      for (const car of this.cityWorld.trafficCars) {
-        const dx = car.mesh.position.x - this.posX;
-        const dz = car.mesh.position.z - this.posZ;
-        const dist = Math.sqrt(dx * dx + dz * dz);
-        if (dist <= maxRadarDist) {
-          radarBlips.push({ x: dx / maxRadarDist, z: dz / maxRadarDist, type: 'car' });
-        }
+      collectiblesSorted.sort((a, b) => a.dist - b.dist);
+      for (let i = 0; i < Math.min(4, collectiblesSorted.length); i++) {
+        const c = collectiblesSorted[i];
+        radarBlips.push({ x: c.dx / maxRadarDist, z: c.dz / maxRadarDist, type: c.type });
       }
 
-      for (const ped of this.cityWorld.pedestrians) {
+      // 2. Pedestrians (Top 6 closest, plus active/closest target pedestrian tagged)
+      const pedsSorted: { dx: number; dz: number; dist: number; isTarget: boolean }[] = [];
+      for (let i = 0; i < this.cityWorld.pedestrians.length; i++) {
+        const ped = this.cityWorld.pedestrians[i];
         const dx = ped.mesh.position.x - this.posX;
         const dz = ped.mesh.position.z - this.posZ;
         const dist = Math.sqrt(dx * dx + dz * dz);
@@ -2895,17 +2896,50 @@ export class GameModeEngine {
           nearestPedDist = dist;
         }
         if (dist <= maxRadarDist) {
-          radarBlips.push({ x: dx / maxRadarDist, z: dz / maxRadarDist, type: 'person' });
+          const isTarget = (this.activeAbductee === ped) || (closestPedTarget === ped && dist < 22);
+          pedsSorted.push({ dx, dz, dist, isTarget });
         }
+      }
+      pedsSorted.sort((a, b) => (b.isTarget ? 1 : 0) - (a.isTarget ? 1 : 0) || a.dist - b.dist);
+      for (let i = 0; i < Math.min(6, pedsSorted.length); i++) {
+        const p = pedsSorted[i];
+        radarBlips.push({ x: p.dx / maxRadarDist, z: p.dz / maxRadarDist, type: 'person', isTarget: p.isTarget });
+      }
+
+      // 3. Traffic Cars (Top 2 closest)
+      const carsSorted: { dx: number; dz: number; dist: number }[] = [];
+      for (const car of this.cityWorld.trafficCars) {
+        const dx = car.mesh.position.x - this.posX;
+        const dz = car.mesh.position.z - this.posZ;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist <= maxRadarDist) {
+          carsSorted.push({ dx, dz, dist });
+        }
+      }
+      carsSorted.sort((a, b) => a.dist - b.dist);
+      for (let i = 0; i < Math.min(2, carsSorted.length); i++) {
+        const c = carsSorted[i];
+        radarBlips.push({ x: c.dx / maxRadarDist, z: c.dz / maxRadarDist, type: 'car' });
       }
     }
 
+    // 4. Police Chasers (ALL included - high threat priority!)
     for (const police of this.policeChasers) {
       const dx = police.mesh.position.x - this.posX;
       const dz = police.mesh.position.z - this.posZ;
       const dist = Math.sqrt(dx * dx + dz * dz);
       if (dist <= maxRadarDist) {
         radarBlips.push({ x: dx / maxRadarDist, z: dz / maxRadarDist, type: 'police' });
+      }
+    }
+
+    // 5. Interceptor Jets (ALL included - high threat priority!)
+    for (const jet of this.interceptorJets) {
+      const dx = jet.posX - this.posX;
+      const dz = jet.posZ - this.posZ;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist <= maxRadarDist * 2) {
+        radarBlips.push({ x: dx / (maxRadarDist * 2), z: dz / (maxRadarDist * 2), type: 'jet' });
       }
     }
 

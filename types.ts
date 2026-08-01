@@ -99,9 +99,10 @@ export interface CityColliderData {
 }
 
 export interface RadarBlip {
-  x: number; // world X relative to player
-  z: number; // world Z relative to player
-  type: 'crystal' | 'police' | 'car' | 'fish' | 'feather' | 'person' | 'debris';
+  x: number; // normalized relative to player radar range (-1 to 1)
+  z: number; // normalized relative to player radar range (-1 to 1)
+  type: 'crystal' | 'police' | 'car' | 'fish' | 'feather' | 'person' | 'debris' | 'jet';
+  isTarget?: boolean;
 }
 
 export interface GameModeTelemetry {
