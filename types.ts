@@ -148,6 +148,7 @@ export interface GameModeTelemetry {
   isBarrelRolling?: boolean;
   subagentProposal?: string;
   cityColliders?: CityColliderData[];
+  lastInputDevice?: 'keyboard' | 'gamepad';
 }
 
 export interface GameModeState {

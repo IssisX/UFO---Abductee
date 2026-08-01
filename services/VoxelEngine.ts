@@ -142,6 +142,70 @@ export class VoxelEngine {
   private voxels: SimulationVoxel[] = [];
   private ghostVoxels: VoxelData[] = [];
   private currentModelData: VoxelData[] = [];
+  // --- LOD System State ---
+  private lodVoxels: { [level: number]: SimulationVoxel[] } = {};
+  private currentLodLevel: number = -1;
+  private cameraDistance: number = 0;
+  
+  private generateLod(voxels: SimulationVoxel[], lodFactor: number): SimulationVoxel[] {
+      if (lodFactor <= 1) return voxels;
+      const voxelMap = new Map<string, SimulationVoxel>();
+      for (const v of voxels) {
+          const gridX = Math.round(v.x / lodFactor) * lodFactor;
+          const gridY = Math.round(v.y / lodFactor) * lodFactor;
+          const gridZ = Math.round(v.z / lodFactor) * lodFactor;
+          const key = `${gridX},${gridY},${gridZ}`;
+          if (!voxelMap.has(key)) {
+              // Copy physics/color properties from original
+              voxelMap.set(key, { ...v, x: gridX, y: gridY, z: gridZ });
+          }
+      }
+      return Array.from(voxelMap.values());
+  }
+
+  private updateLODSystem() {
+      // Calculate distance from camera to model center
+      this.cameraDistance = this.camera.position.distanceTo(this.controls.target);
+      
+      let desiredLevel = 1;
+      if (this.cameraDistance > 120) {
+          desiredLevel = 4; // High decimation
+      } else if (this.cameraDistance > 80) {
+          desiredLevel = 3; // Medium decimation
+      } else if (this.cameraDistance > 50) {
+          desiredLevel = 2; // Low decimation
+      } else {
+          desiredLevel = 1; // Full detail
+      }
+
+      if (this.currentLodLevel !== desiredLevel && this.state === AppState.STABLE && !this.isPlayingAnimation) {
+          this.currentLodLevel = desiredLevel;
+          // Apply LOD if available
+          if (this.lodVoxels[desiredLevel]) {
+              this.applyLodVoxels(this.lodVoxels[desiredLevel]);
+          }
+      }
+  }
+
+  private applyLodVoxels(lodArray: SimulationVoxel[]) {
+      if (!this.instanceMesh) return;
+      // Re-populate instanced mesh with decimated set
+      for (let i = 0; i < lodArray.length; i++) {
+          const v = lodArray[i];
+          this.dummy.position.set(v.x, v.y, v.z);
+          this.dummy.rotation.set(0, 0, 0);
+          this.dummy.updateMatrix();
+          this.instanceMesh.setMatrixAt(i, this.dummy.matrix);
+          this.instanceMesh.setColorAt(i, v.color);
+      }
+      this.instanceMesh.count = lodArray.length;
+      this.instanceMesh.instanceMatrix.needsUpdate = true;
+      if (this.instanceMesh.instanceColor) {
+          this.instanceMesh.instanceColor.needsUpdate = true;
+      }
+      this.onCountChange(lodArray.length);
+  }
+
   private rebuildTargets: RebuildTarget[] = [];
   private rebuildStartTime: number = 0;
   private supernovaStartTime: number = 0;
@@ -446,6 +510,11 @@ export class VoxelEngine {
             rvx: 0, rvy: 0, rvz: 0
         };
     });
+    this.lodVoxels[1] = this.voxels;
+    this.lodVoxels[2] = this.generateLod(this.voxels, 2);
+    this.lodVoxels[3] = this.generateLod(this.voxels, 3);
+    this.lodVoxels[4] = this.generateLod(this.voxels, 4);
+    this.currentLodLevel = -1;
 
     const geometry = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05);
     const material = new THREE.MeshStandardMaterial({ 
@@ -1023,8 +1092,11 @@ export class VoxelEngine {
       this.controls.update();
       this.updatePhysics();
       
+      this.updateLODSystem(); // Execute Dynamic LOD system
+      
       // Always draw during active animation, rotation, or dynamic physics state
       if (this.state !== AppState.STABLE || this.controls.autoRotate || (this.isPlayingAnimation && this.animationFrames.length > 1)) {
+          this.currentLodLevel = 1; // Force full detail during animations/explosions
           this.draw();
       }
     }

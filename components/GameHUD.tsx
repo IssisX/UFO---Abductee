@@ -55,12 +55,55 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const [isNitro, setIsNitro] = useState(false);
 
   // --- HUD STATE ---
-  const [hudMode, setHudMode] = useState<'full' | 'compact' | 'minimal'>('full');
-  const [showJoysticks, setShowJoysticks] = useState<boolean>(true);
+  const [hudMode, setHudMode] = useState<'full' | 'compact' | 'minimal'>('minimal');
+  const [inputPref, setInputPref] = useState<'auto' | 'keyboard' | 'gamepad' | 'touch'>('auto');
   const [isMissionCollapsed, setIsMissionCollapsed] = useState<boolean>(false);
   const [showUpgradesModal, setShowUpgradesModal] = useState<boolean>(false);
   const [minimapZoom, setMinimapZoom] = useState<number>(1.0); // Zoom level 0.5x to 2.0x
   const [minimapExpanded, setMinimapExpanded] = useState<boolean>(false);
+  const [isTabPressed, setIsTabPressed] = useState(false);
+  const [hudActiveTimer, setHudActiveTimer] = useState(0); // completely hidden by default
+
+  // Auto-hide HUD logic
+  const prevTelemetry = useRef<GameModeTelemetry>(telemetry);
+  const [deviceType, setDeviceType] = useState<'mouseKeyboard' | 'gamepad' | 'touch'>(
+    (typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)) ? 'touch' : 'mouseKeyboard'
+  );
+
+  useEffect(() => {
+    if (inputPref !== 'auto') {
+      setDeviceType(inputPref === 'keyboard' ? 'mouseKeyboard' : inputPref);
+      return;
+    }
+
+    if (telemetry.lastInputDevice === 'gamepad') setDeviceType('gamepad');
+    else if (telemetry.lastInputDevice === 'keyboard') setDeviceType('mouseKeyboard');
+    
+    const onTouch = () => setDeviceType('touch');
+    window.addEventListener('touchstart', onTouch, { passive: true });
+    return () => window.removeEventListener('touchstart', onTouch);
+  }, [telemetry.lastInputDevice, inputPref]);
+
+  useEffect(() => {
+    let activity = false;
+    if (telemetry.actionActive || telemetry.boostActive) activity = true;
+    if (telemetry.energy !== prevTelemetry.current.energy) activity = true;
+    if (telemetry.score !== prevTelemetry.current.score) activity = true;
+    if (telemetry.weaponMode !== prevTelemetry.current.weaponMode) activity = true;
+    if (telemetry.wantedLevel !== prevTelemetry.current.wantedLevel && telemetry.wantedLevel > 0) activity = true;
+
+    if (activity) setHudActiveTimer(3000);
+    prevTelemetry.current = telemetry;
+  }, [telemetry]);
+
+  useEffect(() => {
+    if (hudActiveTimer > 0) {
+      const id = setTimeout(() => setHudActiveTimer(h => h - 100), 100);
+      return () => clearTimeout(id);
+    }
+  }, [hudActiveTimer]);
+
+  const isHudContextVisible = isTabPressed || hudMode === 'full';
 
   // Entrance animation
   const [isAnimateIn, setIsAnimateIn] = useState(false);
@@ -83,6 +126,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   // Keyboard hotkeys
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        setIsTabPressed(true);
+      }
       if (e.key === 'h' || e.key === 'H') {
         setHudMode(prev => (prev === 'full' ? 'compact' : prev === 'compact' ? 'minimal' : 'full'));
       }
@@ -92,14 +139,23 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       if (e.key === 'r' || e.key === 'R') {
         onBarrelRoll?.();
       }
-      if (e.key === '1') onSelectWeaponMode?.('tractor');
-      if (e.key === '2') onSelectWeaponMode?.('repulsor');
-      if (e.key === '3') onSelectWeaponMode?.('disintegrator');
-      if (e.key === '4') onSelectWeaponMode?.('vortex');
-      if (e.key === '5') onSelectWeaponMode?.('orbital_laser');
+      if (e.key === 'F1') onSelectWeaponMode?.('tractor');
+      if (e.key === 'F2') onSelectWeaponMode?.('repulsor');
+      if (e.key === 'F3') onSelectWeaponMode?.('disintegrator');
+      if (e.key === 'F4') onSelectWeaponMode?.('vortex');
+      if (e.key === 'F5') onSelectWeaponMode?.('orbital_laser');
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        setIsTabPressed(false);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
   }, [onSelectWeaponMode]);
 
   useEffect(() => {
@@ -251,11 +307,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       )}
 
       {/* --- TOP HUD BAR --- */}
-      <div className="relative z-10 flex items-start justify-between w-full max-w-7xl mx-auto gap-2">
+      <div className={`relative z-10 flex items-start justify-between w-full max-w-7xl mx-auto gap-2 transition-opacity duration-300 ${isHudContextVisible ? 'opacity-100' : 'opacity-0'}`}>
         
         {/* Left: Mode & Vehicle Switcher & Subagent Proposal Pill */}
         <div className={`flex flex-col gap-1.5 transition-all duration-500 ease-out delay-75 transform ${isAnimateIn ? 'translate-y-0 opacity-100' : '-translate-y-12 -translate-x-12 opacity-0'}`}>
-          <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md text-white border border-indigo-500/40 px-3 py-1.5 rounded-2xl shadow-xl flex items-center gap-2">
+          <div className={`${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} bg-slate-900/90 backdrop-blur-md text-white border border-indigo-500/40 px-3 py-1.5 rounded-2xl shadow-xl flex items-center gap-2`}>
             <div className="p-1.5 bg-gradient-to-tr from-indigo-600 to-purple-600 rounded-xl shadow">
               {isUFO ? <Rocket className="text-cyan-300 animate-pulse" size={16} /> : <User className="text-lime-300 animate-bounce" size={16} />}
             </div>
@@ -271,7 +327,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             </div>
           </div>
 
-          <div className="pointer-events-auto flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700/60 shadow-lg self-start">
+          <div className={`${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700/60 shadow-lg self-start`}>
             <button
               onClick={() => onSelectPlayerMode('UFO')}
               className={`flex items-center gap-1 px-3 py-1 rounded-lg font-black text-[11px] transition-all ${
@@ -291,7 +347,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           </div>
 
           {/* Subagent Next-Upgrade Guidance Banner */}
-          <div className="pointer-events-auto bg-slate-950/80 backdrop-blur-md border border-cyan-500/40 px-2.5 py-1 rounded-xl text-[10px] text-cyan-300 shadow flex items-center gap-1.5 max-w-xs animate-pulse">
+          <div className={`${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} bg-slate-950/80 backdrop-blur-md border border-cyan-500/40 px-2.5 py-1 rounded-xl text-[10px] text-cyan-300 shadow flex items-center gap-1.5 max-w-xs animate-pulse`}>
             <Cpu size={12} className="text-cyan-400 animate-spin" />
             <span className="font-bold">Subagent Proposal:</span>
             <span className="text-slate-200">{telemetry.subagentProposal || "Atmospheric Weather Manipulator & Plasma Forcefield Shield"}</span>
@@ -309,65 +365,79 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           )}
 
           {/* GTA Wanted Stars Bar */}
-          {(telemetry.wantedLevel ?? 0) > 0 && (
-            <div className="bg-slate-950/90 border border-rose-500/80 px-3 py-0.5 rounded-full shadow flex items-center gap-1 animate-pulse">
-              <span className="text-[9px] font-black text-rose-400 uppercase tracking-widest mr-1">WANTED</span>
-              {[1, 2, 3, 4, 5].map((starIndex) => (
-                <span key={starIndex} className={`text-xs font-black ${starIndex <= (telemetry.wantedLevel ?? 0) ? 'text-amber-400' : 'text-slate-700'}`}>
-                  ★
-                </span>
-              ))}
-            </div>
-          )}
-
-          <div className="bg-slate-900/90 backdrop-blur-md border border-indigo-500/50 px-4 py-1.5 rounded-2xl shadow-xl flex items-center gap-3 text-white">
-            <div className="flex flex-col items-center">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Score</span>
-              <span className="text-sm sm:text-lg font-black text-cyan-300 font-mono">{(telemetry.score ?? 0).toLocaleString()}</span>
-            </div>
-
-            <div className="h-6 w-px bg-slate-700/80" />
-
-            <div className="flex flex-col items-center">
-              <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-0.5">
-                <Coins size={9} /> Credits
-              </span>
-              <span className="text-xs sm:text-sm font-black text-emerald-300 font-mono">{(telemetry.credits ?? 2500).toLocaleString()} CR</span>
-            </div>
-
-            {(telemetry.comboMultiplier ?? 1) > 1 && (
-              <div className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-rose-500 rounded-lg font-black text-[10px] text-white shadow animate-bounce flex items-center gap-1">
-                <Flame size={12} /> {telemetry.comboMultiplier}x
+          <div className={`transition-opacity duration-300 ${isHudContextVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+            {(telemetry.wantedLevel ?? 0) > 0 && (
+              <div className="bg-slate-950/90 border border-rose-500/80 px-3 py-0.5 rounded-full shadow flex items-center gap-1 animate-pulse">
+                <span className="text-[9px] font-black text-rose-400 uppercase tracking-widest mr-1">WANTED</span>
+                {[1, 2, 3, 4, 5].map((starIndex) => (
+                  <span key={starIndex} className={`text-xs font-black ${starIndex <= (telemetry.wantedLevel ?? 0) ? 'text-amber-400' : 'text-slate-700'}`}>
+                    ★
+                  </span>
+                ))}
               </div>
             )}
           </div>
 
-          {/* Nitro Energy Bar */}
-          <div className="w-36 sm:w-44 bg-slate-900/90 p-1 rounded-full border border-slate-700/80 flex items-center gap-1.5 shadow">
-            <Flame size={10} className={(telemetry.energy ?? 100) < 20 ? "text-rose-500 animate-pulse" : "text-amber-400"} />
-            <div className="flex-1 bg-slate-800 h-1.5 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-150 ${
-                  (telemetry.energy ?? 100) > 50
-                    ? "bg-gradient-to-r from-cyan-400 to-indigo-500"
-                    : (telemetry.energy ?? 100) > 20
-                    ? "bg-gradient-to-r from-amber-400 to-orange-500"
-                    : "bg-rose-500 animate-pulse"
-                }`}
-                style={{ width: `${telemetry.energy ?? 100}%` }}
-              />
+          <div className={`transition-opacity duration-300 ${isHudContextVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+            <div className="bg-slate-900/90 backdrop-blur-md border border-indigo-500/50 px-4 py-1.5 rounded-2xl shadow-xl flex items-center gap-3 text-white mt-1">
+              <div className="flex flex-col items-center">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Score</span>
+                <span className="text-sm sm:text-lg font-black text-cyan-300 font-mono">{(telemetry.score ?? 0).toLocaleString()}</span>
+              </div>
+
+              <div className="h-6 w-px bg-slate-700/80" />
+
+              <div className="flex flex-col items-center">
+                <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-0.5">
+                  <Coins size={9} /> Credits
+                </span>
+                <span className="text-xs sm:text-sm font-black text-emerald-300 font-mono">{(telemetry.credits ?? 2500).toLocaleString()} CR</span>
+              </div>
+
+              {(telemetry.comboMultiplier ?? 1) > 1 && (
+                <div className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-rose-500 rounded-lg font-black text-[10px] text-white shadow animate-bounce flex items-center gap-1">
+                  <Flame size={12} /> {telemetry.comboMultiplier}x
+                </div>
+              )}
             </div>
-            <span className="text-[9px] font-black font-mono text-slate-300">{telemetry.energy ?? 100}%</span>
+          </div>
+
+          {/* Nitro Energy Bar */}
+          <div className={`transition-opacity duration-300 ${isHudContextVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'} mt-1`}>
+            <div className="w-36 sm:w-44 bg-slate-900/90 p-1 rounded-full border border-slate-700/80 flex items-center gap-1.5 shadow">
+              <Flame size={10} className={(telemetry.energy ?? 100) < 20 ? "text-rose-500 animate-pulse" : "text-amber-400"} />
+              <div className="flex-1 bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-150 ${
+                    (telemetry.energy ?? 100) > 50
+                      ? "bg-gradient-to-r from-cyan-400 to-indigo-500"
+                      : (telemetry.energy ?? 100) > 20
+                      ? "bg-gradient-to-r from-amber-400 to-orange-500"
+                      : "bg-rose-500 animate-pulse"
+                  }`}
+                  style={{ width: `${telemetry.energy ?? 100}%` }}
+                />
+              </div>
+              <span className="text-[9px] font-black font-mono text-slate-300">{telemetry.energy ?? 100}%</span>
+            </div>
           </div>
         </div>
 
         {/* Right: Upgrades Tab, Camera, Exit & Interactive Strategic Mini-map */}
         <div className={`flex flex-col items-end gap-1.5 transition-all duration-500 ease-out delay-150 transform ${isAnimateIn ? 'translate-y-0 translate-x-0 opacity-100' : '-translate-y-12 translate-x-12 opacity-0'}`}>
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setInputPref(p => p === 'auto' ? 'keyboard' : p === 'keyboard' ? 'gamepad' : p === 'gamepad' ? 'touch' : 'auto')}
+              className={`${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} bg-slate-800/90 text-slate-300 hover:bg-slate-700 font-black text-[10px] px-2.5 py-1.5 rounded-xl shadow flex items-center gap-1 border border-slate-700 active:scale-95 transition-all`}
+              title="Lock Input Device Preference"
+            >
+              {inputPref === 'auto' ? 'Auto Input' : inputPref === 'keyboard' ? 'Key/Mouse' : inputPref === 'gamepad' ? 'Gamepad' : 'Touch'}
+            </button>
+
             {/* Mothership Upgrades HUD Button */}
             <button
               onClick={() => setShowUpgradesModal(true)}
-              className="pointer-events-auto bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-[10px] px-3 py-1.5 rounded-xl border border-emerald-300/40 flex items-center gap-1.5 shadow-lg active:scale-95 transition-all animate-pulse"
+              className={`${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-[10px] px-3 py-1.5 rounded-xl border border-emerald-300/40 flex items-center gap-1.5 shadow-lg active:scale-95 transition-all animate-pulse`}
             >
               <Wrench size={13} />
               <span>UPGRADES [U]</span>
@@ -377,7 +447,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             {onToggleCinematicCamera && (
               <button
                 onClick={onToggleCinematicCamera}
-                className={`pointer-events-auto font-black text-[10px] px-2.5 py-1.5 rounded-xl shadow flex items-center gap-1 border active:scale-95 transition-all ${
+                className={`${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} font-black text-[10px] px-2.5 py-1.5 rounded-xl shadow flex items-center gap-1 border active:scale-95 transition-all ${
                   telemetry.isCinematicCamera
                     ? 'bg-purple-600 text-cyan-200 border-cyan-400/50'
                     : 'bg-slate-800/90 text-slate-300 border-slate-700 hover:bg-slate-700'
@@ -390,7 +460,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             {/* Exit Button */}
             <button
               onClick={onExitGameMode}
-              className="pointer-events-auto bg-rose-600/90 hover:bg-rose-500 text-white font-black text-[10px] px-2.5 py-1.5 rounded-xl shadow flex items-center gap-1 border border-rose-400/30 active:scale-95 transition-all"
+              className={`${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} bg-rose-600/90 hover:bg-rose-500 text-white font-black text-[10px] px-2.5 py-1.5 rounded-xl shadow flex items-center gap-1 border border-rose-400/30 active:scale-95 transition-all`}
             >
               <X size={12} /> Exit
             </button>
@@ -398,17 +468,18 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
           {/* Simpsons CRT TV Frame */}
           {isUFO && (
-            <div className="pointer-events-auto shadow-2xl">
+            <div className={`transition-opacity duration-300 ${isHudContextVisible ? 'opacity-100' : 'opacity-0'} ${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} shadow-2xl`}>
               <SimpsonsTVCartoon abductionTriggerTime={telemetry.abductionTriggerTime} />
             </div>
           )}
 
           {/* --- INTERACTIVE STRATEGIC MINI-MAP --- */}
-          <div className={`pointer-events-auto relative transition-all duration-300 rounded-2xl bg-slate-950/90 backdrop-blur-xl border border-cyan-500/60 shadow-2xl overflow-hidden flex flex-col items-center ${
-            minimapExpanded ? 'w-64 h-64 sm:w-80 sm:h-80' : 'w-28 h-28 sm:w-36 sm:h-36'
-          }`}>
-            {/* Map Header Overlay */}
-            <div className="absolute top-1 left-2 right-2 z-20 flex items-center justify-between pointer-events-auto">
+          <div className={`transition-opacity duration-300 ${isHudContextVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+            <div className={`${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} relative transition-all duration-300 rounded-2xl bg-slate-950/90 backdrop-blur-xl border border-cyan-500/60 shadow-2xl overflow-hidden flex flex-col items-center ${
+              minimapExpanded ? 'w-64 h-64 sm:w-80 sm:h-80' : 'w-28 h-28 sm:w-36 sm:h-36'
+            }`}>
+              {/* Map Header Overlay */}
+              <div className={`absolute top-1 left-2 right-2 z-20 flex items-center justify-between ${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'}`}>
               <span className="text-[8px] font-black uppercase tracking-widest text-cyan-400 flex items-center gap-1">
                 <Crosshair size={10} /> RADAR
               </span>
@@ -508,6 +579,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               })}
             </div>
           </div>
+          </div>
         </div>
       </div>
 
@@ -552,11 +624,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       )}
 
       {/* --- BOTTOM WEAPONS HOTBAR & MOVEMENT JOYSTICKS --- */}
-      {hudMode !== 'minimal' && (
+      {true && (
         <div className="w-full max-w-7xl mx-auto flex items-end justify-between gap-2 mt-auto">
           {/* Left Joystick */}
-          {showJoysticks ? (
-            <div className={`pointer-events-auto flex flex-col items-center gap-1 transition-all duration-500 ease-out transform ${isAnimateIn ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0'}`}>
+          {deviceType === 'touch' ? (
+            <div className={`${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} flex flex-col items-center gap-1 transition-all duration-500 ease-out transform ${isAnimateIn ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0'}`}>
               <div
                 ref={leftStickRef}
                 onMouseDown={handleLeftStart}
@@ -574,19 +646,19 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               </div>
             </div>
           ) : (
-            <div className="pointer-events-auto bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 text-[10px] text-slate-300 font-bold">
-              WASD / Arrows to Move
+            <div className={`transition-opacity duration-300 ${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 text-[10px] text-slate-300 font-bold ${isHudContextVisible ? 'opacity-100' : 'opacity-0'}`}>
+              {deviceType === 'gamepad' ? 'Left Stick to Move' : 'WASD/Arrows: Move | Space/E: Fly Up | Q/Ctrl: Fly Down'}
             </div>
           )}
 
           {/* DYNAMIC WEAPON MODES HOTBAR & ACTION TRIGGER */}
-          <div className="pointer-events-auto flex flex-col items-center gap-2">
+          <div className={`${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} flex flex-col items-center gap-2`}>
             {/* FLIGHT SIMULATOR ARTIFICIAL HORIZON & JET LOCK OVERLAY */}
             {isUFO && (
-              <div className="pointer-events-none mb-1 flex flex-col items-center justify-center gap-1">
+              <div className={`pointer-events-none mb-1 flex flex-col items-center justify-center gap-1 transition-opacity duration-300 ${isHudContextVisible ? 'opacity-100' : 'opacity-0'}`}>
                 {/* Air Force Jet Target Lock Banner */}
                 {telemetry.targetJetName && (
-                  <div className="bg-slate-950/90 border-2 border-rose-500 text-rose-400 px-3 py-1 rounded-xl shadow-2xl flex items-center gap-2 animate-bounce pointer-events-auto">
+                  <div className={`bg-slate-950/90 border-2 border-rose-500 text-rose-400 px-3 py-1 rounded-xl shadow-2xl flex items-center gap-2 animate-bounce ${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'}`}>
                     <Crosshair size={16} className="text-rose-500 animate-spin" />
                     <div className="flex flex-col items-start">
                       <span className="text-[10px] font-black uppercase tracking-widest text-rose-300">
@@ -626,37 +698,41 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             )}
 
             {/* 5 Weapon Switcher Bar */}
-            <div className="bg-slate-950/90 backdrop-blur-xl p-1.5 rounded-2xl border border-cyan-500/50 shadow-2xl flex items-center gap-1.5">
-              {[
-                { id: 'tractor', name: 'Tractor Beam', key: '1', color: 'from-cyan-500 to-blue-600', icon: '🧲' },
-                { id: 'repulsor', name: 'Repulsor Pulse', key: '2', color: 'from-orange-500 to-red-600', icon: '💥' },
-                { id: 'disintegrator', name: 'Disintegrator Ray', key: '3', color: 'from-fuchsia-500 to-purple-600', icon: '⚡' },
-                { id: 'vortex', name: 'Grav Tornado', key: '4', color: 'from-emerald-500 to-teal-600', icon: '🌀' },
-                { id: 'orbital_laser', name: 'Orbital Laser', key: '5', color: 'from-rose-600 to-amber-600', icon: '☄️' },
-              ].map((wp) => {
-                const isActive = activeWeapon === wp.id;
-                return (
-                  <button
-                    key={wp.id}
-                    onClick={() => onSelectWeaponMode?.(wp.id as WeaponMode)}
-                    className={`relative px-2.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1 border ${
-                      isActive
-                        ? `bg-gradient-to-r ${wp.color} text-white border-white shadow-lg scale-105`
-                        : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-white'
-                    }`}
-                  >
-                    <span>{wp.icon}</span>
-                    <span className="hidden sm:inline">{wp.name}</span>
-                    <span className="text-[9px] bg-slate-950/80 px-1 py-0.5 rounded text-cyan-300 border border-cyan-500/30 font-mono">
-                      [{wp.key}]
-                    </span>
-                  </button>
-                );
-              })}
+            <div className={`transition-opacity duration-300 ${isHudContextVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <div className="bg-slate-950/90 backdrop-blur-xl p-1.5 rounded-2xl border border-cyan-500/50 shadow-2xl flex items-center gap-1.5">
+                {[
+                  { id: 'tractor', name: 'Tractor Beam', key: 'F1', color: 'from-cyan-500 to-blue-600', icon: '🧲', gamepad: 'D-Pad' },
+                  { id: 'repulsor', name: 'Repulsor Pulse', key: 'F2', color: 'from-orange-500 to-red-600', icon: '💥' },
+                  { id: 'disintegrator', name: 'Disintegrator Ray', key: 'F3', color: 'from-fuchsia-500 to-purple-600', icon: '⚡' },
+                  { id: 'vortex', name: 'Grav Tornado', key: 'F4', color: 'from-emerald-500 to-teal-600', icon: '🌀' },
+                  { id: 'orbital_laser', name: 'Orbital Laser', key: 'F5', color: 'from-rose-600 to-amber-600', icon: '☄️' },
+                ].map((wp) => {
+                  const isActive = activeWeapon === wp.id;
+                  return (
+                    <button
+                      key={wp.id}
+                      onClick={() => onSelectWeaponMode?.(wp.id as WeaponMode)}
+                      className={`relative px-2.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1 border ${
+                        isActive
+                          ? `bg-gradient-to-r ${wp.color} text-white border-white shadow-lg scale-105`
+                          : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <span>{wp.icon}</span>
+                      <span className="hidden sm:inline">{wp.name}</span>
+                      {telemetry.lastInputDevice !== 'gamepad' && (
+                        <span className="text-[9px] bg-slate-950/80 px-1 py-0.5 rounded text-cyan-300 border border-cyan-500/30 font-mono">
+                          [{wp.key}]
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Fire Action, Mutant Deploy & Flight Elevation Bar */}
-            <div className="flex items-center gap-1.5">
+            <div className={`flex items-center gap-1.5 transition-opacity duration-300 ${(isHudContextVisible || deviceType === 'touch') ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
               <button
                 onClick={() => setIsNitro(!isNitro)}
                 className={`px-2.5 py-1.5 rounded-xl font-black text-xs text-white shadow-xl flex items-center gap-1 border ${
@@ -665,7 +741,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                     : 'bg-slate-900/90 border-slate-700 text-slate-300'
                 }`}
               >
-                <Flame size={14} /> Nitro
+                <Flame size={14} /> Nitro {deviceType === 'mouseKeyboard' ? '[Shift]' : deviceType === 'gamepad' ? '[LT/RT]' : ''}
               </button>
 
               {/* Evasive Barrel Roll Button */}
@@ -677,10 +753,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                       ? 'bg-sky-500 text-white border-white animate-spin scale-110'
                       : 'bg-gradient-to-r from-sky-600 to-blue-700 border-sky-400 text-white hover:scale-105 active:scale-95'
                   }`}
-                  title="Perform 360° Evasive Corkscrew Roll [Hotkey: R]"
+                  title="Perform 360° Evasive Corkscrew Roll"
                 >
                   <RefreshCw size={14} className={telemetry.isBarrelRolling ? 'animate-spin' : ''} />
-                  <span>BARREL ROLL [R]</span>
+                  <span>BARREL ROLL {deviceType === 'mouseKeyboard' ? '[R]' : deviceType === 'gamepad' ? '[B/○]' : ''}</span>
                 </button>
               )}
 
@@ -700,7 +776,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               </button>
 
               {isFlying ? (
-                <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-700/80">
+                <div className={`flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-700/80 ${deviceType !== 'touch' ? 'hidden' : ''}`}>
                   <button
                     onMouseDown={() => setAscendInput(1)}
                     onMouseUp={() => setAscendInput(0)}
@@ -725,7 +801,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   onClick={() => onJump && onJump()}
                   className="px-3.5 py-2 bg-emerald-600 text-white font-black text-xs rounded-xl flex items-center gap-1"
                 >
-                  <ArrowUp size={14} /> JUMP [Space]
+                  <ArrowUp size={14} /> JUMP {deviceType === 'mouseKeyboard' ? '[Space]' : deviceType === 'gamepad' ? '[A/✕]' : ''}
                 </button>
               )}
 
@@ -734,14 +810,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 className="px-5 py-2 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-black text-xs rounded-xl shadow-xl flex items-center gap-1.5 border border-cyan-300 active:scale-95 transition-all"
               >
                 <Zap size={15} className="animate-bounce" />
-                <span>FIRE WEAPON [F]</span>
+                <span>FIRE {deviceType === 'mouseKeyboard' ? '[F]' : deviceType === 'gamepad' ? '[X/□]' : ''}</span>
               </button>
             </div>
           </div>
 
           {/* Right Camera Stick */}
-          {showJoysticks ? (
-            <div className={`pointer-events-auto flex flex-col items-center gap-1 transition-all duration-500 ease-out transform ${isAnimateIn ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0'}`}>
+          {deviceType === 'touch' ? (
+            <div className={`${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} flex flex-col items-center gap-1 transition-all duration-500 ease-out transform ${isAnimateIn ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0'}`}>
               <div
                 ref={rightStickRef}
                 onMouseDown={handleRightStart}
@@ -759,8 +835,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               </div>
             </div>
           ) : (
-            <div className="pointer-events-auto bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 text-[10px] text-slate-300 font-bold">
-              Mouse Drag to Orbit
+            <div className={`transition-opacity duration-300 ${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 text-[10px] text-slate-300 font-bold ${isHudContextVisible ? 'opacity-100' : 'opacity-0'}`}>
+              {deviceType === 'gamepad' ? 'Right Stick to Orbit' : 'Mouse Drag to Orbit'}
             </div>
           )}
         </div>
@@ -768,7 +844,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
       {/* --- MOTHERSHIP UPGRADES HUD DRAWER MODAL --- */}
       {showUpgradesModal && (
-        <div className="fixed inset-0 z-50 pointer-events-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div className={`fixed inset-0 z-50 ${isHudContextVisible || deviceType === 'touch' ? 'pointer-events-auto' : 'pointer-events-none'} bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4`}>
           <div className="relative w-full max-w-2xl bg-slate-900 border border-cyan-500/50 rounded-3xl p-6 text-white shadow-2xl flex flex-col gap-5">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">

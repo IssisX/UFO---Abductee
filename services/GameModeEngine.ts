@@ -846,6 +846,7 @@ export class GameModeEngine {
   public currentRollAngle: number = 0;
   public currentPitchAngle: number = 0;
   public currentGForce: number = 1.0;
+  public lastInputDevice: 'keyboard' | 'gamepad' = 'keyboard';
 
   public triggerBarrelRoll(): boolean {
     if (this.playerMode !== 'UFO' || this.barrelRollCooldown > 0) return false;
@@ -1049,8 +1050,9 @@ export class GameModeEngine {
 
     const dummy = new THREE.Object3D();
     voxels.forEach((v, i) => {
-      dummy.position.set(v.x - cx, v.y - cy, v.z - cz);
-      dummy.scale.set(1, 1, 1);
+      const vScale = this.playerMode === 'Alien' ? 0.333 : 1.0;
+      dummy.position.set((v.x - cx) * vScale, ((v.y - cy) * vScale) + (this.playerMode === 'Alien' ? 2.5 : 0), (v.z - cz) * vScale);
+      dummy.scale.set(vScale, vScale, vScale);
       dummy.updateMatrix();
       this.playerMesh!.setMatrixAt(i, dummy.matrix);
       this.playerMesh!.setColorAt(i, new THREE.Color(v.color));
@@ -1066,22 +1068,34 @@ export class GameModeEngine {
     window.addEventListener('keydown', (e) => {
       if (!this.isActive) return;
       this.keys[e.code] = true;
+      if (e.key) this.keys[e.key] = true;
+      
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+        e.preventDefault();
+      }
+      
+      // Prevent browser scrolling for game controls
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+        e.preventDefault();
+      }
+
       if (e.code === 'KeyF') {
         this.triggerAction();
       }
       if (e.code === 'KeyR') {
         this.triggerBarrelRoll();
       }
-      if (e.code === 'Digit1') this.setWeaponMode('tractor');
-      if (e.code === 'Digit2') this.setWeaponMode('repulsor');
-      if (e.code === 'Digit3') this.setWeaponMode('disintegrator');
-      if (e.code === 'Digit4') this.setWeaponMode('vortex');
-      if (e.code === 'Digit5') this.setWeaponMode('orbital_laser');
+      if (e.code === 'F1') { e.preventDefault(); this.setWeaponMode('tractor'); }
+      if (e.code === 'F2') { e.preventDefault(); this.setWeaponMode('repulsor'); }
+      if (e.code === 'F3') { e.preventDefault(); this.setWeaponMode('disintegrator'); }
+      if (e.code === 'F4') { e.preventDefault(); this.setWeaponMode('vortex'); }
+      if (e.code === 'F5') { e.preventDefault(); this.setWeaponMode('orbital_laser'); }
     });
 
     window.addEventListener('keyup', (e) => {
       if (!this.isActive) return;
       this.keys[e.code] = false;
+      if (e.key) this.keys[e.key] = false;
     });
 
     window.addEventListener('mousedown', (e) => {
@@ -2130,8 +2144,78 @@ export class GameModeEngine {
 
     this.updateInterceptorJets(deltaTime);
 
+    let isGamepadInput = false;
+    let isKeyboardInput = false;
+
+    // Detect gamepad
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const gp = gamepads[0];
+    
+    // Check keyboard activity
+    if (Object.values(this.keys).some(v => v)) {
+      isKeyboardInput = true;
+    }
+
+    let gpInputFwd = 0;
+    let gpInputStrafe = 0;
+    let gpWantBoost = false;
+
+    if (gp) {
+      // Deadzones
+      const lx = Math.abs(gp.axes[0]) > 0.15 ? gp.axes[0] : 0;
+      const ly = Math.abs(gp.axes[1]) > 0.15 ? gp.axes[1] : 0;
+      const rx = Math.abs(gp.axes[2]) > 0.15 ? gp.axes[2] : 0;
+      const ry = Math.abs(gp.axes[3]) > 0.15 ? gp.axes[3] : 0;
+
+      if (lx !== 0 || ly !== 0) {
+        gpInputStrafe += lx;
+        gpInputFwd -= ly; // y axis is inverted usually
+        isGamepadInput = true;
+      }
+      
+      if (rx !== 0 || ry !== 0) {
+        this.rotateCamera(-rx * 0.04, ry * 0.04);
+        isGamepadInput = true;
+      }
+      
+      // Boost mapped to Left Trigger (6) or Right Trigger (7)
+      if (gp.buttons[6]?.pressed || gp.buttons[7]?.pressed) {
+        gpWantBoost = true;
+        isGamepadInput = true;
+      }
+
+      // X/Square or A/Cross for Action
+      if (gp.buttons[2]?.pressed || gp.buttons[0]?.pressed) {
+        if (!this.keys['GamepadAction']) {
+          if (this.playerMode === 'Alien') this.triggerJump();
+          else this.triggerAction();
+          this.keys['GamepadAction'] = true;
+        }
+        isGamepadInput = true;
+      } else {
+        this.keys['GamepadAction'] = false;
+      }
+
+      // B/Circle for Barrel Roll
+      if (gp.buttons[1]?.pressed) {
+        if (!this.keys['GamepadRoll']) {
+          this.triggerBarrelRoll();
+          this.keys['GamepadRoll'] = true;
+        }
+        isGamepadInput = true;
+      } else {
+        this.keys['GamepadRoll'] = false;
+      }
+    }
+
+    if (isKeyboardInput) {
+      this.lastInputDevice = 'keyboard';
+    } else if (isGamepadInput) {
+      this.lastInputDevice = 'gamepad';
+    }
+
     // --- Nitro Energy Consumption & Regeneration ---
-    const isWantBoost = !!(this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.virtualInput.boost);
+    const isWantBoost = !!(this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.virtualInput.boost || gpWantBoost);
     let isBoost = false;
 
     if (isWantBoost && this.energy > 5) {
@@ -2142,46 +2226,47 @@ export class GameModeEngine {
       this.energy = Math.min(100, this.energy + 0.2);
     }
 
-    const moveSpeed = (isBoost ? 1.8 : 0.9) * (this.playerMode === 'UFO' ? 1.2 : 0.8);
+    const moveSpeed = (isBoost ? 45.0 : 18.0) * (this.playerMode === 'UFO' ? 1.2 : 0.8);
 
     // Movement Vector relative to Camera Yaw
-    let inputFwd = this.virtualInput.fwd;
-    let inputStrafe = this.virtualInput.strafe;
+    let inputFwd = this.virtualInput.fwd + gpInputFwd;
+    let inputStrafe = this.virtualInput.strafe + gpInputStrafe;
 
-    if (this.keys['KeyW'] || this.keys['ArrowUp']) inputFwd += 1;
-    if (this.keys['KeyS'] || this.keys['ArrowDown']) inputFwd -= 1;
-    if (this.keys['KeyA'] || this.keys['ArrowLeft']) inputStrafe -= 1;
-    if (this.keys['KeyD'] || this.keys['ArrowRight']) inputStrafe += 1;
+    if (this.keys['KeyW'] || this.keys['w'] || this.keys['ArrowUp']) inputFwd += 1;
+    if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) inputFwd -= 1;
+    if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) inputStrafe -= 1;
+    if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) inputStrafe += 1;
 
     // Clamp Inputs
     inputFwd = Math.max(-1, Math.min(1, inputFwd));
     inputStrafe = Math.max(-1, Math.min(1, inputStrafe));
 
+    const maxSpeed = (isBoost ? 32.0 : 18.0) * (this.playerMode === 'UFO' ? 1.2 : 0.8);
+
     // Compute Direction relative to Camera View
     if (inputFwd !== 0 || inputStrafe !== 0) {
       const inputLen = Math.hypot(inputFwd, inputStrafe);
-      const normFwd = inputLen > 0 ? inputFwd / inputLen : 0;
-      const normStrafe = inputLen > 0 ? inputStrafe / inputLen : 0;
+      const normFwd = inputFwd / inputLen;
+      const normStrafe = inputStrafe / inputLen;
 
       // Camera orientation vectors in world space
-      const forwardX = Math.sin(this.camYaw);
-      const forwardZ = Math.cos(this.camYaw);
+      const forwardX = -Math.sin(this.camYaw);
+      const forwardZ = -Math.cos(this.camYaw);
       const rightX = Math.cos(this.camYaw);
       const rightZ = -Math.sin(this.camYaw);
 
-      // Project thumbstick inputs onto camera forward and right directions
-      const targetVelX = (forwardX * normFwd + rightX * normStrafe) * moveSpeed;
-      const targetVelZ = (forwardZ * normFwd + rightZ * normStrafe) * moveSpeed;
+      // Target velocity in world m/s
+      const targetVelX = (forwardX * normFwd + rightX * normStrafe) * maxSpeed;
+      const targetVelZ = (forwardZ * normFwd + rightZ * normStrafe) * maxSpeed;
 
-      const lerpFactor = 0.22;
-      this.velX += (targetVelX - this.velX) * lerpFactor;
-      this.velZ += (targetVelZ - this.velZ) * lerpFactor;
+      this.velX += (targetVelX - this.velX) * 0.18;
+      this.velZ += (targetVelZ - this.velZ) * 0.18;
 
       const targetRot = Math.atan2(this.velX, this.velZ);
       let rotDiff = targetRot - this.rotY;
       while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
       while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
-      this.rotY += rotDiff * 0.25;
+      this.rotY += rotDiff * 0.22;
     } else {
       this.velX *= 0.82;
       this.velZ *= 0.82;
@@ -2190,29 +2275,54 @@ export class GameModeEngine {
     // --- Physics by Player Mode ---
     if (this.playerMode === 'UFO' && this.ufoBody) {
       let ascendInput = this.virtualInput.ascend;
-      if (this.keys['Space']) ascendInput += 1;
-      if (this.keys['KeyE'] || this.keys['ControlLeft']) ascendInput -= 1;
+      if (
+        this.keys['Space'] ||
+        this.keys[' '] ||
+        this.keys['KeyE'] ||
+        this.keys['e'] ||
+        this.keys['E'] ||
+        this.keys['ShiftLeft'] ||
+        this.keys['ShiftRight'] ||
+        this.keys['Shift'] ||
+        this.keys['PageUp']
+      ) {
+        ascendInput += 1;
+      }
+      if (
+        this.keys['KeyQ'] ||
+        this.keys['q'] ||
+        this.keys['Q'] ||
+        this.keys['ControlLeft'] ||
+        this.keys['ControlRight'] ||
+        this.keys['Control'] ||
+        this.keys['KeyC'] ||
+        this.keys['c'] ||
+        this.keys['PageDown']
+      ) {
+        ascendInput -= 1;
+      }
       
-      // Apply forces to CANNON body
-      const forceMag = moveSpeed * 800; // Force multiplier for heavy UFO
-      const forceY = ascendInput * forceMag * 0.8;
-      
-      // Compute force from vel inputs
-      const fX = this.velX * 300; 
-      const fZ = this.velZ * 300;
-      
-      // Counteract gravity and add control forces
+      const forceY = ascendInput * 12000; 
+
+      // Directly sync CANNON body velocity with our kinematic movement vector
+      this.ufoBody.velocity.x = this.velX;
+      this.ufoBody.velocity.z = this.velZ;
+
+      // Counteract gravity completely for hover stability
       const antiGravity = 9.81 * this.ufoBody.mass;
-      this.ufoBody.applyForce(new CANNON.Vec3(fX, forceY + antiGravity, fZ), this.ufoBody.position);
-      
+      this.ufoBody.applyForce(new CANNON.Vec3(0, forceY + antiGravity, 0), this.ufoBody.position);
+
+      if (ascendInput === 0) {
+        this.ufoBody.velocity.y *= 0.88;
+      }
+
       // Read state back from physics
       this.posX = this.ufoBody.position.x;
-      this.posY = this.ufoBody.position.y;
+      this.posY = Math.max(3.0, Math.min(150.0, this.ufoBody.position.y));
+      this.ufoBody.position.y = this.posY;
       this.posZ = this.ufoBody.position.z;
-      
-      this.velX = this.ufoBody.velocity.x;
+
       this.velY = this.ufoBody.velocity.y;
-      this.velZ = this.ufoBody.velocity.z;
 
       const hoverBob = Math.sin(performance.now() * 0.003) * 0.05;
       this.posY += hoverBob;
@@ -2228,8 +2338,8 @@ export class GameModeEngine {
         this.currentRollAngle = progress * Math.PI * 2;
         this.currentPitchAngle = Math.sin(progress * Math.PI) * 0.3;
       } else {
-        const targetBank = -inputStrafe * 0.45 - (this.velX * 0.08);
-        const targetPitch = inputFwd * 0.28 + (this.velZ * 0.08);
+        const targetBank = -inputStrafe * 0.35 - (this.velX * 0.01);
+        const targetPitch = inputFwd * 0.20 + (this.velZ * 0.01);
         this.currentRollAngle = THREE.MathUtils.lerp(this.currentRollAngle, targetBank, 0.15);
         this.currentPitchAngle = THREE.MathUtils.lerp(this.currentPitchAngle, targetPitch, 0.15);
       }
@@ -2241,7 +2351,7 @@ export class GameModeEngine {
         mat.opacity = Math.max(0, mat.opacity - 0.03);
       }
 
-      const currSpeedNorm = Math.min(1.0, Math.hypot(this.velX, this.velY, this.velZ) / moveSpeed);
+      const currSpeedNorm = Math.min(1.0, Math.hypot(this.velX, this.velY, this.velZ) / maxSpeed);
       this.audio.updateEngineHum(currSpeedNorm);
 
       if (isBoost || Math.abs(this.velX) > 0.5 || Math.abs(this.velZ) > 0.5) {
@@ -2281,8 +2391,8 @@ export class GameModeEngine {
     }
 
     // Apply Position & Building Collision Resolution (Manual for Aliens, skipped if UFO using physics)
-    let nextX = this.posX + (this.playerMode === 'UFO' ? 0 : this.velX);
-    let nextZ = this.posZ + (this.playerMode === 'UFO' ? 0 : this.velZ);
+    let nextX = this.posX + (this.playerMode === 'UFO' ? 0 : this.velX * deltaTime);
+    let nextZ = this.posZ + (this.playerMode === 'UFO' ? 0 : this.velZ * deltaTime);
 
     if (this.cityWorld && this.playerMode !== 'UFO') {
       const playerRadius = 1.2;
@@ -2806,7 +2916,7 @@ export class GameModeEngine {
       const spd = Math.hypot(this.velX, this.velZ);
       if (spd > 0.04) {
         // Automatically align camera yaw with movement heading so camera follows behind player
-        const targetYaw = Math.atan2(this.velX, this.velZ);
+        const targetYaw = Math.atan2(this.velX, this.velZ) + Math.PI;
         let diff = targetYaw - this.camYaw;
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
@@ -2821,29 +2931,36 @@ export class GameModeEngine {
       this.camPitch = THREE.MathUtils.lerp(this.camPitch, targetPitch, 0.02);
     }
 
-    // --- Camera Follow Controller with Screen Shake ---
-    const camDist = this.playerMode === 'UFO' ? 24 : 14;
-    const camHeight = this.playerMode === 'UFO' ? 8 : 4;
+    // --- Camera Follow Controller (Clean, Zero-Warp, Pro-Grade Smooth Follow) ---
+    const camDist = this.playerMode === 'UFO' ? 26 : 16;
+    const camHeight = this.playerMode === 'UFO' ? 9 : 4;
 
-    const shakeX = (Math.random() - 0.5) * this.screenShake;
-    const shakeY = (Math.random() - 0.5) * this.screenShake;
-    this.screenShake = Math.max(0, this.screenShake - 0.05);
+    // Enforce fixed, stable FOV = 55 to eliminate perspective warping
+    if (this.camera.fov !== 55) {
+      this.camera.fov = 55;
+      this.camera.updateProjectionMatrix();
+    }
 
-    const cx = this.posX - Math.sin(this.camYaw) * camDist * Math.cos(this.camPitch) + shakeX;
-    const cz = this.posZ - Math.cos(this.camYaw) * camDist * Math.cos(this.camPitch) + shakeX;
-    const cy = this.posY + Math.sin(this.camPitch) * camDist + camHeight + shakeY;
+    // Always reset up vector to standard Y-up
+    this.camera.up.set(0, 1, 0);
 
-    this.camera.position.lerp(new THREE.Vector3(cx, cy, cz), 0.12);
-    this.camera.lookAt(this.posX, this.posY + 2, this.posZ);
+    const cx = this.posX + Math.sin(this.camYaw) * Math.cos(this.camPitch) * camDist;
+    const cz = this.posZ + Math.cos(this.camYaw) * Math.cos(this.camPitch) * camDist;
+    const cy = this.posY + Math.sin(this.camPitch) * camDist + camHeight;
 
-    // Dynamic Cinematic FOV Warp based on speed
-    const currentSpeed = Math.sqrt(this.velX * this.velX + this.velY * this.velY + this.velZ * this.velZ);
-    const targetFov = 45 + (currentSpeed * 15.0); // Warp FOV up as speed increases
-    this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 0.08);
-    this.camera.updateProjectionMatrix();
+    // Smooth camera position tracking
+    this.camera.position.lerp(new THREE.Vector3(cx, cy, cz), 0.14);
+
+    // Look cleanly at player position
+    const targetX = this.posX;
+    const targetY = this.posY + (this.playerMode === 'UFO' ? 1.0 : 1.5);
+    const targetZ = this.posZ;
+
+    this.camera.lookAt(targetX, targetY, targetZ);
 
     // --- Send Telemetry ---
-    const telemetrySpeed = Math.round(currentSpeed * 45);
+    const currentSpeed = Math.hypot(this.velX, this.velY, this.velZ);
+    const telemetrySpeed = Math.round(currentSpeed * 2.237); // Convert m/s to MPH
     const cityColliders = this.cityWorld ? this.cityWorld.colliders.map(col => ({
       x: col.x - this.posX,
       z: col.z - this.posZ,
@@ -2916,7 +3033,8 @@ export class GameModeEngine {
         gForce: Number((1.0 + currentSpeed * 0.15 + (this.barrelRollTimer > 0 ? 3.5 : 0)).toFixed(1)),
         isBarrelRolling: this.barrelRollTimer > 0,
         subagentProposal: "Atmospheric Weather Manipulator & Plasma Forcefield Shield",
-        cityColliders: cityColliders
+        cityColliders: cityColliders,
+        lastInputDevice: this.lastInputDevice
       });
     }
   }

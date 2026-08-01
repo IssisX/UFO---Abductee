@@ -380,7 +380,7 @@ export const UfoSplashScreen: React.FC<UfoSplashScreenProps> = ({ onStartGame })
         {/* MASSIVE BADASS LAUNCH BUTTON */}
         <button
           onClick={onStartGame}
-          className="group relative w-full sm:w-auto px-10 py-5 bg-gradient-to-r from-cyan-500 via-lime-400 to-emerald-400 hover:from-cyan-400 hover:to-lime-300 text-slate-950 font-black text-xl sm:text-2xl tracking-wider uppercase rounded-3xl shadow-[0_0_50px_rgba(163,230,53,0.6)] flex items-center justify-center gap-3 active:scale-95 transition-all duration-200 border-2 border-white/80 cursor-pointer overflow-hidden"
+          className="group relative w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-sm sm:text-base tracking-widest uppercase rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.4)] flex items-center justify-center gap-2 active:scale-95 transition-all duration-300 border border-cyan-400/50 cursor-pointer overflow-hidden"
         >
           {/* Button Shine Sweep Effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out" />
