@@ -418,6 +418,14 @@ export class GameAudioEngine {
   private engineGain: GainNode | null = null;
   private engineFilter: BiquadFilterNode | null = null;
 
+  public playTractorSound() {
+    this.playAbductionSound();
+  }
+
+  public playWeaponSound() {
+    this.playLaserSound();
+  }
+
   public updateEngineHum(speedNorm: number) {
     try {
       this.init();

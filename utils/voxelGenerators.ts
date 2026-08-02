@@ -129,65 +129,70 @@ export const Generators = {
         const SUIT_DARK = 0x1e293b;
         const RAY_GREEN = 0xa3e635;
 
-        // HIGH FIDELITY ALIEN (Scaled 3x larger in coords, will be rendered 3x smaller)
+        // PROPORTIONAL SLEEK EXTRATERRESTRIAL (Height: ~42 voxels)
         
-        // Feet & Boots
-        generateSphere(map, AX - 4.5, AY + 1.5, AZ, 3.6, SUIT_DARK);
-        generateSphere(map, AX + 4.5, AY + 1.5, AZ, 3.6, SUIT_DARK);
+        // 1. Sleek Boots & Feet (y: 1 to 3)
+        generateSphere(map, AX - 2.8, AY + 1.5, AZ + 0.5, 2.2, SUIT_DARK);
+        generateSphere(map, AX + 2.8, AY + 1.5, AZ + 0.5, 2.2, SUIT_DARK);
 
-        // Slender Legs
-        for (let y = 3; y <= 15; y++) {
-            generateSphere(map, AX - 4.0, AY + y, AZ, 1.8, ALIEN_GREY);
-            generateSphere(map, AX + 4.0, AY + y, AZ, 1.8, ALIEN_GREY);
+        // 2. Slender Long Legs (y: 3 to 13)
+        for (let y = 3; y <= 13; y++) {
+            generateSphere(map, AX - 2.8, AY + y, AZ, 1.4, ALIEN_GREY);
+            generateSphere(map, AX + 2.8, AY + y, AZ, 1.4, ALIEN_GREY);
         }
 
-        // Torso / Body (Space Suit with glowing green chest reactor)
-        for (let y = 16; y <= 36; y++) {
-            const r = 6.6 - (y - 16) * 0.15;
+        // 3. Tapered Sleek Torso (y: 14 to 28)
+        for (let y = 14; y <= 28; y++) {
+            // Waist at y=14 is r=3.2, Chest at y=24 is r=4.5, Shoulders at y=28 is r=4.8
+            const t = (y - 14) / 14;
+            const r = 3.2 + Math.sin(t * Math.PI) * 1.6;
             generateSphere(map, AX, AY + y, AZ, r, ALIEN_GREY);
         }
         
-        // Chest Reactor
-        generateSphere(map, AX, AY + 25, AZ + 4.5, 2.5, RAY_GREEN);
+        // Glowing Bio-Core Reactor on chest
+        generateSphere(map, AX, AY + 23, AZ + 3.6, 2.0, RAY_GREEN);
 
-        // Arms & Ray Blaster
-        for (let y = 20; y <= 33; y++) {
-            generateSphere(map, AX - 6.6, AY + y, AZ, 1.8, ALIEN_GREY);
-            generateSphere(map, AX + 6.6, AY + y, AZ, 1.8, ALIEN_GREY);
+        // 4. Slender Articulated Arms & Quantum Blaster
+        // Left Arm (y: 18 to 28, x: -5.5)
+        for (let y = 18; y <= 28; y++) {
+            generateSphere(map, AX - 5.5, AY + y, AZ, 1.3, ALIEN_GREY);
+        }
+        // Right Arm (y: 18 to 28, x: +5.5)
+        for (let y = 18; y <= 28; y++) {
+            generateSphere(map, AX + 5.5, AY + y, AZ, 1.3, ALIEN_GREY);
         }
 
-        // Blaster in right hand
-        generateSphere(map, AX + 7.5, AY + 24, AZ + 3, 3, SUIT_DARK);
-        generateSphere(map, AX + 7.5, AY + 24, AZ + 6, 2, RAY_GREEN);
-        setBlock(map, AX + 7.5, AY + 24, AZ + 8, RAY_GREEN);
+        // Plasma Blaster in Right Hand
+        generateSphere(map, AX + 6.0, AY + 18, AZ + 2.5, 2.2, SUIT_DARK);
+        generateSphere(map, AX + 6.0, AY + 18, AZ + 5.0, 1.6, RAY_GREEN);
+        setBlock(map, AX + 6.0, AY + 18, AZ + 7.0, EYE_GLOW);
 
-        // Neck
-        generateSphere(map, AX, AY + 37, AZ, 2, ALIEN_GREY_DARK);
-        generateSphere(map, AX, AY + 38, AZ, 2, ALIEN_GREY);
+        // 5. Elongated Neck (y: 29 to 31)
+        for (let y = 29; y <= 31; y++) {
+            generateSphere(map, AX, AY + y, AZ, 1.6, ALIEN_GREY_DARK);
+        }
 
-        // Proportional Gray Alien Oval Head (Smaller relative to body than before)
-        const HEAD_Y = AY + 45;
-        generateSphere(map, AX, HEAD_Y, AZ, 7.5, ALIEN_GREY, 1.2);
-        generateSphere(map, AX, HEAD_Y + 4, AZ, 8.5, ALIEN_GREY, 0.9);
-        generateSphere(map, AX, HEAD_Y + 8, AZ - 1, 7.5, ALIEN_GREY, 0.8);
+        // 6. Sleek Aerodynamic Alien Head (y: 32 to 42, Sleek & Proportional!)
+        const HEAD_Y = AY + 36;
+        // Oval chin & cheeks
+        generateSphere(map, AX, HEAD_Y - 2, AZ + 1.0, 3.2, ALIEN_GREY, 1.1);
+        // Main skull dome (slightly extended to back for alien cranium shape)
+        generateSphere(map, AX, HEAD_Y + 1, AZ - 0.5, 4.6, ALIEN_GREY, 0.95);
+        generateSphere(map, AX, HEAD_Y + 4, AZ - 1.2, 4.2, ALIEN_GREY, 0.85);
 
-        // Large Black Almond Eyes
-        // Left Eye (Detailed)
-        generateSphere(map, AX - 3.5, HEAD_Y + 1, AZ + 6.5, 2.5, EYE_BLACK, 1.5);
-        setBlock(map, AX - 3.0, HEAD_Y + 2.5, AZ + 8.5, EYE_GLOW);
+        // Slanted Glossy Black Almond Eyes (Sleek & Iconic)
+        // Left Eye
+        generateSphere(map, AX - 2.2, HEAD_Y, AZ + 3.2, 1.8, EYE_BLACK, 1.3);
+        setBlock(map, AX - 1.8, HEAD_Y + 0.8, AZ + 4.2, EYE_GLOW);
 
-        // Right Eye (Detailed)
-        generateSphere(map, AX + 3.5, HEAD_Y + 1, AZ + 6.5, 2.5, EYE_BLACK, 1.5);
-        setBlock(map, AX + 3.0, HEAD_Y + 2.5, AZ + 8.5, EYE_GLOW);
+        // Right Eye
+        generateSphere(map, AX + 2.2, HEAD_Y, AZ + 3.2, 1.8, EYE_BLACK, 1.3);
+        setBlock(map, AX + 1.8, HEAD_Y + 0.8, AZ + 4.2, EYE_GLOW);
 
-        // Small Slit Nostrils
-        setBlock(map, AX - 0.5, HEAD_Y - 3, AZ + 7, ALIEN_GREY_DARK);
-        setBlock(map, AX + 0.5, HEAD_Y - 3, AZ + 7, ALIEN_GREY_DARK);
-        
-        // Small Mouth
-        setBlock(map, AX, HEAD_Y - 5.5, AZ + 6.5, EYE_BLACK);
-        setBlock(map, AX - 0.5, HEAD_Y - 5.5, AZ + 6.5, EYE_BLACK);
-        setBlock(map, AX + 0.5, HEAD_Y - 5.5, AZ + 6.5, EYE_BLACK);
+        // Subtle Nostrils & Small Lips
+        setBlock(map, AX - 0.4, HEAD_Y - 2.5, AZ + 3.8, ALIEN_GREY_DARK);
+        setBlock(map, AX + 0.4, HEAD_Y - 2.5, AZ + 3.8, ALIEN_GREY_DARK);
+        setBlock(map, AX, HEAD_Y - 3.5, AZ + 3.6, EYE_BLACK);
 
         return Array.from(map.values());
     },
@@ -271,32 +276,34 @@ export const Generators = {
       for (let f = 0; f < numFrames; f++) {
         const map = new Map<string, VoxelData>();
         const phase = (f / numFrames) * Math.PI * 2;
-        const floatY = Math.sin(phase) * 1.2 + 6;
+        const floatY = Math.sin(phase) * 2.4 + 12;
 
-        // Saucer Central Dome (Glass/Cyan)
-        generateSphere(map, 0, floatY + 2.5, 0, 3.0, 0x00F0FF, 0.8);
+        // Saucer Central Dome (Glass/Cyan) - doubled from 3.0 to 6.0
+        generateSphere(map, 0, floatY + 5.0, 0, 6.0, 0x00F0FF, 0.8);
 
-        // Saucer Main Disk (Metallic Slate)
-        generateSphere(map, 0, floatY, 0, 7.5, 0x4B5563, 0.3);
+        // Saucer Main Disk (Metallic Slate) - doubled from 7.5 to 15.0
+        generateSphere(map, 0, floatY, 0, 15.0, 0x4B5563, 0.3);
 
         // Perimeter Spinning LED Lights
-        const numLights = 8;
+        const numLights = 12; // increased lights for higher fidelity
         for (let i = 0; i < numLights; i++) {
           const angle = phase + (i / numLights) * Math.PI * 2;
-          const lx = Math.cos(angle) * 7.2;
-          const lz = Math.sin(angle) * 7.2;
+          const lx = Math.cos(angle) * 14.4;
+          const lz = Math.sin(angle) * 14.4;
           const lightCol = (i + f) % 2 === 0 ? 0x00FF66 : 0xFF00AA;
-          setBlock(map, lx, floatY - 0.2, lz, lightCol);
+          setBlock(map, lx, floatY - 0.4, lz, lightCol);
+          setBlock(map, lx, floatY - 0.4, lz + 1, lightCol);
+          setBlock(map, lx + 1, floatY - 0.4, lz, lightCol);
         }
 
         // Pulsing Neon Tractor Beam Below UFO
         const beamPhase = (f / numFrames);
-        for (let dy = 1; dy <= 12; dy++) {
-          const beamR = 1.0 + (dy * 0.35);
+        for (let dy = 2; dy <= 24; dy+=2) {
+          const beamR = 2.0 + (dy * 0.35);
           const beamY = floatY - dy;
           const opacityStep = (dy + f) % 3 === 0;
           if (opacityStep) {
-            for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
+            for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
               const bx = Math.cos(a + phase) * beamR;
               const bz = Math.sin(a + phase) * beamR;
               setBlock(map, bx, beamY, bz, 0x00E5FF);

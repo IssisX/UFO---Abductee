@@ -78,7 +78,7 @@ export interface Quest {
   reward: number;
 }
 
-export type WeaponMode = 'tractor' | 'repulsor' | 'disintegrator' | 'vortex' | 'orbital_laser';
+export type WeaponMode = 'tractor' | 'repulsor' | 'disintegrator' | 'vortex' | 'orbital_laser' | 'quantum_tether' | 'singularity';
 
 export interface MothershipUpgrades {
   beamForce: number; // 1 to 5
@@ -88,6 +88,8 @@ export interface MothershipUpgrades {
   vortexRange: number; // 1 to 5
   energyCore: number; // 1 to 5
   mutagenEfficiency?: number; // 1 to 5
+  singularityMass?: number;
+  tetherStrength?: number;
 }
 
 export interface CityColliderData {
@@ -170,12 +172,58 @@ export interface GameModeTelemetry {
   jetRoll?: number;
   jetHeading?: number;
   enemyJetsState?: EnemyJetState[];
+  possessedConstruct?: PossessedConstructState | null;
+  summonedAIObjects?: any[];
+  possessedObject?: any;
 }
 
 export interface GameModeState {
   isActive: boolean;
   playerMode: PlayerMode;
   telemetry: GameModeTelemetry;
+}
+
+export interface SynthesizedVoxel extends VoxelData {
+  mat?: 'emissive' | 'metallic' | 'glass' | 'standard';
+  part?: string;
+}
+
+export interface ElementalComposition {
+  element: string;
+  percentage: number;
+}
+
+export interface Synthesized3DObject {
+  id?: string;
+  name: string;
+  description: string;
+  animationType: 'walk' | 'fly' | 'pulse' | 'float' | 'spin' | 'bounce';
+  physicsType: 'rigid' | 'companion' | 'vehicle' | 'hazard' | 'floating';
+  placementDomain?: 'ground' | 'air' | 'high_sky';
+  recommendedSpawnHeightMeters?: number;
+  locomotionType?: 'walk' | 'flight' | 'hover_drift' | 'stationary';
+  baseSpeed?: number;
+  abilities?: string[];
+  canBePossessed?: boolean;
+  styleScheme?: string;
+  energyOutput?: string;
+  massKg?: number;
+  threatLevel?: 'Benign' | 'Tactical' | 'Extreme';
+  composition?: ElementalComposition[];
+  voxels: SynthesizedVoxel[];
+}
+
+export interface PossessedConstructState {
+  id: string;
+  name: string;
+  description: string;
+  placementDomain: 'ground' | 'air' | 'high_sky';
+  locomotionType: 'walk' | 'flight' | 'hover_drift' | 'stationary';
+  baseSpeed: number;
+  abilities: string[];
+  energyOutput?: string;
+  massKg?: number;
+  voxelsCount: number;
 }
 
 export type AIModelId = 'gemini-3.6-flash' | 'gemini-3.1-pro-preview';

@@ -352,7 +352,7 @@ export const SimpsonsTVCartoon: React.FC<SimpsonsTVCartoonProps> = ({ abductionT
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [isPlaying, channel]);
+  }, [isPlaying, channel, isMinimized]);
 
   const handleReplay = () => {
     startTimeRef.current = performance.now();

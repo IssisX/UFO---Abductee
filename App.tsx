@@ -113,6 +113,38 @@ const App: React.FC = () => {
     return engineRef.current?.triggerGameBarrelRoll() ?? false;
   }, []);
 
+  const handleSummonAIObject = useCallback((prompt: string, params?: any) => {
+    return engineRef.current?.summonAISynthesizedObject(prompt, params) ?? Promise.resolve({ success: false, error: 'Engine not ready' });
+  }, []);
+
+  const handleGetSummonedObjects = useCallback(() => {
+    return engineRef.current?.getSummonedObjectsTelemetry() ?? [];
+  }, []);
+
+  const handleRecallAIObject = useCallback((id: string) => {
+    return engineRef.current?.recallAIObject(id) ?? false;
+  }, []);
+
+  const handleOverchargeAIObject = useCallback((id: string) => {
+    return engineRef.current?.overchargeAIObject(id) ?? false;
+  }, []);
+
+  const handleDeconstructAIObject = useCallback((id: string) => {
+    return engineRef.current?.deconstructAIObject(id) ?? false;
+  }, []);
+
+  const handleTeleportToAIObject = useCallback((id: string) => {
+    return engineRef.current?.teleportToAIObject(id) ?? false;
+  }, []);
+
+  const handlePossessAIObject = useCallback((id: string) => {
+    return engineRef.current?.possessAIObject(id) ?? false;
+  }, []);
+
+  const handleEjectPossession = useCallback(() => {
+    return engineRef.current?.ejectFromPossession() ?? false;
+  }, []);
+
   return (
     <div className="relative w-full h-screen bg-[#f0f2f5] overflow-hidden">
       {/* 3D Container */}
@@ -134,6 +166,14 @@ const App: React.FC = () => {
           onPurchaseUpgrade={handlePurchaseUpgrade}
           onDeployMutant={handleDeployMutant}
           onBarrelRoll={handleBarrelRoll}
+          onSummonAIObject={handleSummonAIObject}
+          onGetSummonedObjects={handleGetSummonedObjects}
+          onRecallAIObject={handleRecallAIObject}
+          onOverchargeAIObject={handleOverchargeAIObject}
+          onDeconstructAIObject={handleDeconstructAIObject}
+          onTeleportToAIObject={handleTeleportToAIObject}
+          onPossessAIObject={handlePossessAIObject}
+          onEjectPossession={handleEjectPossession}
         />
       )}
 

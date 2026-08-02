@@ -282,6 +282,8 @@ export class VoxelEngine {
     this.bloomPass.radius = 0.3;
 
     this.composer = new EffectComposer(this.renderer);
+    this.composer.setSize(window.innerWidth, window.innerHeight);
+    this.composer.setPixelRatio(this.renderer.getPixelRatio());
     this.composer.addPass(renderScene);
     this.composer.addPass(this.bloomPass);
 
@@ -1110,7 +1112,11 @@ export class VoxelEngine {
       }
     }
     
-    this.composer.render();
+    try {
+      this.composer.render();
+    } catch (err) {
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 
   // --- GAME MODE PUBLIC INTERFACE ---
@@ -1123,10 +1129,10 @@ export class VoxelEngine {
     
     // Sunset Magic Hour Atmospheric Overhaul
     this.scene.background = new THREE.Color(0x1a0a2a);
-    this.scene.fog = new THREE.FogExp2(0x280e3d, 0.007);
-    this.bloomPass.strength = 1.35;
-    this.bloomPass.threshold = 0.32;
-    this.bloomPass.radius = 0.90;
+    this.scene.fog = new THREE.FogExp2(0x280e3d, 0.003);
+    this.bloomPass.strength = 0.85;
+    this.bloomPass.threshold = 0.55;
+    this.bloomPass.radius = 0.50;
 
     const voxelsToUse = customVoxels || this.getCurrentVoxels();
     this.gameModeEngine.start(playerMode, voxelsToUse);
@@ -1198,6 +1204,33 @@ export class VoxelEngine {
     return this.gameModeEngine.triggerBarrelRoll();
   }
 
+  public async summonAISynthesizedObject(
+    prompt: string,
+    params?: { styleScheme?: string; energyCore?: string; complexity?: string }
+  ) {
+    return this.gameModeEngine.summonAIObject(prompt, params);
+  }
+
+  public getSummonedObjectsTelemetry() {
+    return this.gameModeEngine.getSummonedObjectsTelemetry();
+  }
+
+  public recallAIObject(id: string) {
+    return this.gameModeEngine.recallAIObject(id);
+  }
+
+  public overchargeAIObject(id: string) {
+    return this.gameModeEngine.overchargeAIObject(id);
+  }
+
+  public deconstructAIObject(id: string) {
+    return this.gameModeEngine.deconstructAIObject(id);
+  }
+
+  public teleportToAIObject(id: string) {
+    return this.gameModeEngine.teleportToAIObject(id);
+  }
+
   public setOnGameTelemetryUpdate(cb: (t: GameModeTelemetry) => void) {
     this.gameModeEngine.setOnTelemetryUpdate(cb);
   }
@@ -1207,6 +1240,10 @@ export class VoxelEngine {
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+        if (this.composer) {
+          this.composer.setSize(window.innerWidth, window.innerHeight);
+          this.composer.setPixelRatio(this.renderer.getPixelRatio());
+        }
       }
   }
   
@@ -1329,6 +1366,18 @@ export class VoxelEngine {
           this.ghostMesh = null;
       }
       this.ghostVoxels = [];
+  }
+
+  public possessAIObject(id: string): boolean {
+    return this.gameModeEngine.possessAIObject(id);
+  }
+
+  public ejectFromPossession(): boolean {
+    return this.gameModeEngine.ejectFromPossession();
+  }
+
+  public triggerPossessedPrimaryAbility() {
+    this.gameModeEngine.triggerPossessedPrimaryAbility();
   }
 
   public getJsonData(): string {

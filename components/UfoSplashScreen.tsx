@@ -354,21 +354,21 @@ export const UfoSplashScreen: React.FC<UfoSplashScreenProps> = ({ onStartGame })
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.2, type: 'spring', stiffness: 100 }}
-        className="relative z-10 w-full max-w-4xl mx-auto text-center pt-8 sm:pt-12"
+        className="relative z-10 w-full max-w-4xl mx-auto text-center pt-8 sm:pt-16"
       >
         <motion.div 
           animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
           transition={{ duration: 3, repeat: Infinity }}
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-400/50 text-cyan-300 text-xs font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 mb-4"
+          className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-cyan-950/40 backdrop-blur-md border border-cyan-400/30 text-cyan-300 text-[10px] sm:text-xs font-black uppercase tracking-[0.3em] shadow-lg shadow-cyan-500/20 mb-6"
         >
           <Sparkles size={14} className="text-lime-400" />
           <span>EARTH INVASION 3D SIMULATOR</span>
         </motion.div>
 
-        <h1 className="text-5xl sm:text-8xl font-black uppercase tracking-tight text-white drop-shadow-[0_10px_35px_rgba(6,182,212,0.8)]">
-          UFO <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-lime-300 to-emerald-300">ABDUCTION</span>
+        <h1 className="text-6xl sm:text-[9rem] leading-none font-display font-black uppercase tracking-tighter text-white drop-shadow-[0_10px_35px_rgba(6,182,212,0.8)] mix-blend-plus-lighter">
+          UFO <span className="text-transparent bg-clip-text bg-gradient-to-br from-cyan-300 via-lime-300 to-emerald-400">ABDUCTION</span>
         </h1>
-        <p className="text-sm sm:text-base font-bold text-slate-300 tracking-wider uppercase mt-3 drop-shadow">
+        <p className="text-xs sm:text-sm font-bold text-slate-300/80 tracking-[0.2em] uppercase mt-6 drop-shadow">
           PILOT THE MOTHERSHIP • ABDUCT PEDESTRIANS • CAUSE CHAOS
         </p>
       </motion.div>
